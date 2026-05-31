@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { exchangeCode } from "@/lib/google/oauth";
 import { encrypt } from "@/lib/google/encrypt";
@@ -19,7 +20,14 @@ export async function GET(request: Request) {
 
   let tenantId: string;
   try {
-    const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+    const outer = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+    const { payload, sig } = outer;
+    const secret = process.env.SHEET_TOKEN_SECRET ?? "";
+    const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) {
+      return NextResponse.redirect(`${appUrl}/admin?error=invalid_state`);
+    }
+    const parsed = JSON.parse(payload);
     tenantId = parsed.tenantId;
   } catch {
     return NextResponse.redirect(`${appUrl}/admin?error=invalid_state`);

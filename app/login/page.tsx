@@ -27,14 +27,16 @@ export default function LoginPage() {
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    const returnTo = new URLSearchParams(window.location.search).get("returnTo") || "/";
+    const raw = new URLSearchParams(window.location.search).get("returnTo") || "/";
+    const returnTo = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
     startTransition(async () => {
       const result = await loginAction(password, returnTo);
       if (result?.error) {
         toast.error(result.error === "Incorrect password" ? "Incorrect password" : "Login failed — check server config");
         return;
       }
-      // Hard reload so the browser sends all fresh session cookies in the next request
+      // Hard reload so the browser sends all fresh session cookies in the next request.
+      // Only follow relative paths — guard against open redirect via ?returnTo=https://evil.com
       window.location.href = returnTo;
     });
   }

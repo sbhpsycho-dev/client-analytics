@@ -104,6 +104,9 @@ async function createSheet(
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function POST() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const auth = new google.auth.GoogleAuth({

@@ -36,7 +36,10 @@ export async function GET(request: Request) {
     .order("date", { ascending: false })
     .limit(50);
 
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+  if (dbErr) {
+    console.error("[calls GET]", dbErr);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
   return NextResponse.json({ calls: data });
 }
 
@@ -68,7 +71,10 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+  if (dbErr) {
+    console.error("[calls POST]", dbErr);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 
   await service.from("audit_logs").insert({
     tenant_id,

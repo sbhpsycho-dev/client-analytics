@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -5,16 +6,23 @@ import { cookies } from "next/headers";
 import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 export async function POST(request: Request) {
-  const { password } = await request.json();
+  const body = await request.json();
+  const { password } = body;
 
   const masterPassword = process.env.MASTER_PASSWORD;
   const adminEmail = process.env.ADMIN_EMAIL;
 
-  if (!masterPassword || !adminEmail) {
+  if (!masterPassword?.trim() || !adminEmail?.trim()) {
     return NextResponse.json({ error: "Not configured" }, { status: 500 });
   }
 
-  if (password.trim() !== masterPassword.trim()) {
+  if (typeof password !== "string") {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const pwBuf = Buffer.from(password.trim());
+  const mpBuf = Buffer.from(masterPassword.trim());
+  if (pwBuf.length !== mpBuf.length || !crypto.timingSafeEqual(pwBuf, mpBuf)) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
 

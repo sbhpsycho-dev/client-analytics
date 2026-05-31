@@ -1,5 +1,6 @@
 "use server";
 
+import crypto from "crypto";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -12,10 +13,12 @@ export async function loginAction(
   const masterPassword = process.env.MASTER_PASSWORD;
   const adminEmail     = process.env.ADMIN_EMAIL;
 
-  if (!masterPassword || !adminEmail) {
+  if (!masterPassword?.trim() || !adminEmail?.trim()) {
     return { error: "Server not configured" };
   }
-  if (password.trim() !== masterPassword.trim()) {
+  const pwBuf = Buffer.from(password.trim());
+  const mpBuf = Buffer.from(masterPassword.trim());
+  if (pwBuf.length !== mpBuf.length || !crypto.timingSafeEqual(pwBuf, mpBuf)) {
     return { error: "Incorrect password" };
   }
 

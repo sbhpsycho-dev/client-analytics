@@ -3,12 +3,10 @@ import { SignJWT, jwtVerify } from "jose";
 export const COOKIE_NAME = "leadwell_session";
 export const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-// Secret derived from always-present credentials — no separate env var needed.
 function getSecret() {
-  const pw = process.env.MASTER_PASSWORD;
-  const em = process.env.ADMIN_EMAIL;
-  if (!pw || !em) throw new Error("MASTER_PASSWORD / ADMIN_EMAIL not configured");
-  return new TextEncoder().encode(`${pw}::${em}::leadwell_auth_v1`);
+  const s = process.env.SESSION_SECRET;
+  if (!s?.trim()) throw new Error("SESSION_SECRET not configured");
+  return new TextEncoder().encode(s);
 }
 
 export interface AdminSession {

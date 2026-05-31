@@ -21,7 +21,10 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[team-kpis]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
   return NextResponse.json(data);
 }
 
@@ -36,6 +39,9 @@ export async function DELETE(request: Request) {
 
   const service = createServiceClient();
   const { error } = await (service as any).from("team_kpis").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[team-kpis]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
