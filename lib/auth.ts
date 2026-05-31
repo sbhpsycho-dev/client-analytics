@@ -22,8 +22,14 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  // Fall back to SESSION_SECRET so existing deployments work without new env var
-  secret: process.env.NEXTAUTH_SECRET ?? process.env.SESSION_SECRET,
+  // Fallback chain mirrors the old lib/session.ts logic so Vercel deploys with only
+  // MASTER_PASSWORD + ADMIN_EMAIL continue to work without new env vars.
+  secret:
+    process.env.NEXTAUTH_SECRET ??
+    process.env.SESSION_SECRET ??
+    (process.env.MASTER_PASSWORD && process.env.ADMIN_EMAIL
+      ? `${process.env.MASTER_PASSWORD}::${process.env.ADMIN_EMAIL}::leadwell_auth_v1`
+      : undefined),
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   callbacks: {

@@ -35,3 +35,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ synced: Object.keys(results).length, results });
 }
+
+export async function POST(request: Request) {
+  return GET(request);
+}
