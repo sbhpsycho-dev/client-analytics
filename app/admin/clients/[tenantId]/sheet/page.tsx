@@ -72,13 +72,24 @@ export default function SheetPage() {
 
   async function handleConnectGoogle() {
     setConnecting(true);
-    const res = await fetch("/api/admin/sheets/connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tenantId }),
-    });
-    const { url } = await res.json();
-    window.location.href = url;
+    try {
+      const res = await fetch("/api/admin/sheets/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Failed to start Google connection");
+        return;
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch {
+      toast.error("Failed to start Google connection");
+    } finally {
+      setConnecting(false);
+    }
   }
 
   async function handleSetSheetUrl() {

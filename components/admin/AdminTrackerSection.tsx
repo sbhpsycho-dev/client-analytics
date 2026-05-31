@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const ROLES = ["Setter", "Closer", "Sales Director", "VA", "Manager"];
 
@@ -29,6 +30,7 @@ export function AdminTrackerSection({ tenantId, existing }: { tenantId: string; 
     period_label: "",
   });
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -52,8 +54,19 @@ export function AdminTrackerSection({ tenantId, existing }: { tenantId: string; 
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/team-kpis?id=${id}`, { method: "DELETE" });
-    startTransition(() => router.refresh());
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/admin/team-kpis?id=${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Failed to delete entry");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Failed to delete entry");
+    } finally {
+      setDeleting(null);
+    }
   }
 
   return (
@@ -125,7 +138,8 @@ export function AdminTrackerSection({ tenantId, existing }: { tenantId: string; 
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(row.id)}
-                      className="text-zinc-600 hover:text-red-400 transition-colors"
+                      disabled={deleting === row.id}
+                      className="text-zinc-600 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
