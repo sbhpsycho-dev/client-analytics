@@ -12,14 +12,14 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // ── Step 1: Check local custom session cookie (admin, zero network calls) ──
+  // ── Step 1: Check local JWT session cookie (admin — zero network calls) ──
+  // lib/session.ts has NO next/headers import, so this is safe in proxy context.
   const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
   const adminSession = await verifyAdminSession(sessionToken);
 
   if (adminSession) {
-    const role = adminSession.role;
+    const { role } = adminSession;
 
-    // /admin/* — agency staff only
     if (pathname.startsWith("/admin")) {
       if (role !== "agency_admin" && role !== "agency_agent") {
         return NextResponse.redirect(new URL("/", request.url));
@@ -27,44 +27,25 @@ export default async function proxy(request: NextRequest) {
       return NextResponse.next({ request });
     }
 
-    // /clients/[tenant]/* — agency staff can access any tenant
     if (pathname.startsWith("/clients/")) {
       if (role === "agency_admin" || role === "agency_agent") {
         return NextResponse.next({ request });
       }
     }
 
-    // Root → route admin to first active tenant or /admin
+    // Root → send admin straight to /admin (no Supabase query needed here)
     if (pathname === "/") {
       if (role === "agency_admin" || role === "agency_agent") {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          return NextResponse.redirect(new URL("/admin", request.url));
-        }
-        // Use service client to find first active tenant (no auth session needed)
-        const { createClient: createSupabase } = await import("@supabase/supabase-js");
-        const supabase = createSupabase(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-        const { data: firstTenant } = await supabase
-          .from("tenants")
-          .select("slug")
-          .eq("status", "active")
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .single();
-        const dest = firstTenant?.slug ? `/clients/${firstTenant.slug}` : "/admin";
-        return NextResponse.redirect(new URL(dest, request.url));
+        return NextResponse.redirect(new URL("/admin", request.url));
       }
     }
 
-    // All other paths — admin is authenticated, pass through
+    // Any other authenticated path — pass through
     return NextResponse.next({ request });
   }
 
-  // ── Step 2: Fall back to Supabase Auth (for client users) ──
+  // ── Step 2: Fall back to Supabase Auth (for client users via invite links) ──
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    // No Supabase config — can't validate, send to login
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("returnTo", pathname);
@@ -138,9 +119,7 @@ export default async function proxy(request: NextRequest) {
       .eq("slug", slug)
       .single();
 
-    if (!tenant) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+    if (!tenant) return NextResponse.redirect(new URL("/", request.url));
 
     const { data: membership } = await supabase
       .from("tenant_memberships")
@@ -150,9 +129,7 @@ export default async function proxy(request: NextRequest) {
       .eq("invite_status", "accepted")
       .single();
 
-    if (!membership) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+    if (!membership) return NextResponse.redirect(new URL("/", request.url));
 
     response.headers.set("x-tenant-role", membership.role);
     return response;
@@ -160,28 +137,16 @@ export default async function proxy(request: NextRequest) {
 
   if (pathname === "/") {
     if (role === "agency_admin" || role === "agency_agent") {
-      const { data: firstTenant } = await supabase
-        .from("tenants")
-        .select("slug")
-        .eq("status", "active")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .single();
-      const dest = firstTenant?.slug ? `/clients/${firstTenant.slug}` : "/admin";
-      return NextResponse.redirect(new URL(dest, request.url));
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
-
     const { data: memberships } = await supabase
       .from("tenant_memberships")
       .select("tenant_id, tenants(slug)")
       .eq("user_id", user.id)
       .eq("invite_status", "accepted")
       .limit(1);
-
     const firstSlug = (memberships?.[0] as any)?.tenants?.slug;
-    if (firstSlug) {
-      return NextResponse.redirect(new URL(`/clients/${firstSlug}`, request.url));
-    }
+    if (firstSlug) return NextResponse.redirect(new URL(`/clients/${firstSlug}`, request.url));
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 

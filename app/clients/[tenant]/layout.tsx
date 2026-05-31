@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { resolveTenantBySlug } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getAdminSession } from "@/lib/session";
+import { getAdminSession } from "@/lib/server-session";
 import { ClientSidebar } from "@/components/shared/ClientSidebar";
 import { ClientTopNav, MobileBottomBar } from "@/components/shared/ClientTopNav";
 import { MobileNav } from "@/components/shared/MobileNav";

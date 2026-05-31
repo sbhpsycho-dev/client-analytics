@@ -1,8 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
 
-const COOKIE_NAME = "leadwell_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const COOKIE_NAME = "leadwell_session";
+export const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 function getSecret() {
   const raw = process.env.SHEET_TOKEN_SECRET;
@@ -23,6 +22,7 @@ export async function signAdminSession(email: string, role: string): Promise<str
     .sign(getSecret());
 }
 
+// Safe to import anywhere including proxy.ts — no next/headers dependency.
 export async function verifyAdminSession(token: string | undefined): Promise<AdminSession | null> {
   if (!token) return null;
   try {
@@ -35,12 +35,3 @@ export async function verifyAdminSession(token: string | undefined): Promise<Adm
     return null;
   }
 }
-
-// Server-component helper — reads cookie from the request automatically
-export async function getAdminSession(): Promise<AdminSession | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-  return verifyAdminSession(token);
-}
-
-export { COOKIE_NAME, COOKIE_MAX_AGE };
