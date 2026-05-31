@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { resolveTenantBySlug } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { ClientSidebar } from "@/components/shared/ClientSidebar";
-import { ClientTopNav } from "@/components/shared/ClientTopNav";
+import { ClientTopNav, MobileBottomBar } from "@/components/shared/ClientTopNav";
 import { MobileNav } from "@/components/shared/MobileNav";
 import { BrandProvider } from "@/components/shared/BrandProvider";
 import { AlertCircle } from "lucide-react";
@@ -71,9 +71,13 @@ export default async function ClientLayout({
           {/* Horizontal tab bar — shown on all breakpoints */}
           <ClientTopNav tenantSlug={slug} brandColor={tenantData.brand_color} />
 
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          {/* Extra bottom padding on mobile so content clears the bottom tab bar */}
+          <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
         </div>
       </div>
+
+      {/* Mobile bottom tab bar — outside the scrollable column so it stays fixed */}
+      <MobileBottomBar tenantSlug={slug} brandColor={tenantData.brand_color} />
     </BrandProvider>
   );
 }

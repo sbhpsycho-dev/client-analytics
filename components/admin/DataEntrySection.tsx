@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Trash2, Plus, Loader2 } from "lucide-react";
 
 const INPUT = "w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
@@ -120,10 +121,13 @@ export function DataEntrySection({ tenantId, initialCalls, initialLeads }: {
 
   return (
     <div className="space-y-5">
-      {msg && (
-        <div className={`rounded-lg px-4 py-3 text-sm font-medium ${msg.ok ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+      {msg && msg.ok && (
+        <div className="rounded-lg px-4 py-3 text-sm font-medium bg-emerald-500/15 text-emerald-400">
           {msg.text}
         </div>
+      )}
+      {msg && !msg.ok && (
+        <ErrorBanner message={msg.text} onDismiss={() => setMsg(null)} />
       )}
 
       {/* Sub-tabs */}

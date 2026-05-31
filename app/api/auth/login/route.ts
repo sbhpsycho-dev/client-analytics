@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase/service";
 import { cookies } from "next/headers";
+import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 export async function POST(request: Request) {
   const { password } = await request.json();
@@ -20,6 +21,12 @@ export async function POST(request: Request) {
   const service = createServiceClient();
 
   const cookieStore = await cookies();
+
+  // Capture every cookie Supabase wants to set so we can write them
+  // explicitly onto the NextResponse (cookies().set() alone does not
+  // propagate into a separately-constructed NextResponse object).
+  const captured: Array<{ name: string; value: string; options: Partial<ResponseCookie> }> = [];
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -27,6 +34,7 @@ export async function POST(request: Request) {
       cookies: {
         getAll() { return cookieStore.getAll(); },
         setAll(cookiesToSet) {
+          captured.push(...cookiesToSet);
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
           );
@@ -89,8 +97,6 @@ export async function POST(request: Request) {
   }
 
   // Always ensure the admin user has agency_admin role in user_profiles.
-  // signInWithPassword succeeds without touching user_profiles, so the role
-  // may be null/missing — causing middleware to treat the user as a client.
   const { data: { user: signedInUser } } = await supabase.auth.getUser();
   if (signedInUser) {
     await service.from("user_profiles").upsert({
@@ -100,5 +106,13 @@ export async function POST(request: Request) {
     }, { onConflict: "id" } as any);
   }
 
-  return NextResponse.json({ ok: true });
+  // Build the response and explicitly apply all session cookies so the
+  // browser actually stores them (NextResponse.json creates a new object
+  // that otherwise has no Set-Cookie headers).
+  const response = NextResponse.json({ ok: true });
+  captured.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options as ResponseCookie);
+  });
+
+  return response;
 }

@@ -8,6 +8,7 @@ import { SetterLeaderboard } from "@/components/dashboard/SetterLeaderboard";
 import { CloserLeaderboard } from "@/components/dashboard/CloserLeaderboard";
 import { FilledCard } from "@/components/dashboard/FilledCard";
 import { DateRangeNav } from "@/components/dashboard/DateRangeNav";
+import { AccordionSection } from "@/components/ui/accordion-section";
 import { Suspense } from "react";
 
 const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -138,59 +139,68 @@ async function DashboardContent({
         </div>
       )}
 
-      {/* Row 1 — primary KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <FilledCard index={0} label="Cash Collected"   value={fmt.format(kpis.cashCollected)}  theme="emerald" />
-        <FilledCard index={1} label="Contract Value"   value={fmt.format(kpis.contractValue)}  theme="navy"    />
-        <FilledCard index={2} label="Calls Booked"     value={kpis.callsBooked}               theme="slate"   />
-        <FilledCard index={3} label="Deals Closed"     value={kpis.funnel.closed}             theme="emerald" />
-        <FilledCard index={4} label="Show Rate"        value={`${kpis.showRate}%`}            theme="teal"    />
-        <FilledCard index={5} label="Close Rate"       value={`${kpis.closeRate}%`}           theme="teal"    />
-      </div>
+      {/* ── Primary KPIs ───────────────────────────────────────── */}
+      <AccordionSection title="Primary KPIs" defaultOpen storageKey="kpis-primary">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 pt-1">
+          <FilledCard index={0} label="Cash Collected"   value={fmt.format(kpis.cashCollected)}  theme="emerald" />
+          <FilledCard index={1} label="Contract Value"   value={fmt.format(kpis.contractValue)}  theme="navy"    />
+          <FilledCard index={2} label="Calls Booked"     value={kpis.callsBooked}               theme="slate"   />
+          <FilledCard index={3} label="Deals Closed"     value={kpis.funnel.closed}             theme="emerald" />
+          <FilledCard index={4} label="Show Rate"        value={`${kpis.showRate}%`}            theme="teal"    />
+          <FilledCard index={5} label="Close Rate"       value={`${kpis.closeRate}%`}           theme="teal"    />
+        </div>
+      </AccordionSection>
 
-      {/* Row 2 — secondary KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <FilledCard index={6}  label="AOV"           value={fmt.format(kpis.aov)}           theme="navy"  sub="Per closed deal" />
-        <FilledCard index={7}  label="Pipeline"      value={fmt.format(kpis.pipelineValue)} theme="amber" sub="Open pipeline" />
-        <FilledCard index={8}  label="Shows"         value={kpis.callsShowed}               theme="slate" sub="Showed up" />
-        <FilledCard index={9}  label="No-Shows"      value={kpis.noShows}                   theme="slate" sub="Did not attend" />
-        <FilledCard index={10} label="Reschedules"   value={kpis.reschedules}               theme="amber" sub="Rebooked" />
-        <FilledCard index={11} label="No-Show Rate"  value={`${kpis.noShowRate}%`}          theme="slate" sub="Of total" />
-      </div>
+      {/* ── Secondary KPIs ─────────────────────────────────────── */}
+      <AccordionSection title="Pipeline Breakdown" defaultOpen storageKey="kpis-secondary">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 pt-1">
+          <FilledCard index={6}  label="AOV"           value={fmt.format(kpis.aov)}           theme="navy"  sub="Per closed deal" />
+          <FilledCard index={7}  label="Pipeline"      value={fmt.format(kpis.pipelineValue)} theme="amber" sub="Open pipeline" />
+          <FilledCard index={8}  label="Shows"         value={kpis.callsShowed}               theme="slate" sub="Showed up" />
+          <FilledCard index={9}  label="No-Shows"      value={kpis.noShows}                   theme="slate" sub="Did not attend" />
+          <FilledCard index={10} label="Reschedules"   value={kpis.reschedules}               theme="amber" sub="Rebooked" />
+          <FilledCard index={11} label="No-Show Rate"  value={`${kpis.noShowRate}%`}          theme="slate" sub="Of total" />
+        </div>
+      </AccordionSection>
 
-      {/* Monthly goal — only show in MTD view */}
+      {/* ── Monthly goal ────────────────────────────────────────── */}
       {!fromParam && !toParam && (
         <GoalProgress current={kpis.cashCollected} goal={monthlyGoal} brandColor={tenant.brand_color} />
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl p-5" style={CHART_CARD}>
-          <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Calls Over Time</p>
-          <TrendChart data={kpis.trends} metric="callsBooked" color={tenant.brand_color} />
+      {/* ── Charts ─────────────────────────────────────────────── */}
+      <AccordionSection title="Trends & Funnel" defaultOpen storageKey="charts">
+        <div className="space-y-4 pt-1">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2 rounded-xl p-5" style={CHART_CARD}>
+              <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Calls Over Time</p>
+              <TrendChart data={kpis.trends} metric="callsBooked" color={tenant.brand_color} />
+            </div>
+            <div className="rounded-xl p-5" style={CHART_CARD}>
+              <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Sales Funnel</p>
+              <FunnelChart funnel={kpis.funnel} brandColor={tenant.brand_color} />
+            </div>
+          </div>
+          <div className="rounded-xl p-5" style={CHART_CARD}>
+            <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Revenue Over Time</p>
+            <TrendChart data={kpis.trends} metric="revenue" color={tenant.brand_color} />
+          </div>
         </div>
-        <div className="rounded-xl p-5" style={CHART_CARD}>
-          <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Sales Funnel</p>
-          <FunnelChart funnel={kpis.funnel} brandColor={tenant.brand_color} />
-        </div>
-      </div>
+      </AccordionSection>
 
-      <div className="rounded-xl p-5" style={CHART_CARD}>
-        <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Revenue Over Time</p>
-        <TrendChart data={kpis.trends} metric="revenue" color={tenant.brand_color} />
-      </div>
-
-      {/* Leaderboards */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl p-5" style={CHART_CARD}>
-          <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Setter Leaderboard</p>
-          <SetterLeaderboard data={kpis.setterLeaderboard} />
+      {/* ── Leaderboards ───────────────────────────────────────── */}
+      <AccordionSection title="Leaderboards" defaultOpen storageKey="leaderboards">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 pt-1">
+          <div className="rounded-xl p-5" style={CHART_CARD}>
+            <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Setter Leaderboard</p>
+            <SetterLeaderboard data={kpis.setterLeaderboard} />
+          </div>
+          <div className="rounded-xl p-5" style={CHART_CARD}>
+            <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Closer Leaderboard</p>
+            <CloserLeaderboard data={kpis.closerLeaderboard} />
+          </div>
         </div>
-        <div className="rounded-xl p-5" style={CHART_CARD}>
-          <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>Closer Leaderboard</p>
-          <CloserLeaderboard data={kpis.closerLeaderboard} />
-        </div>
-      </div>
+      </AccordionSection>
 
     </div>
   );
