@@ -21,75 +21,9 @@ export async function loginAction(
 
   const cookieStore = await cookies();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        // In a Server Action, cookieStore.set() is committed to the response
-        // before redirect() fires — this is the key difference from Route Handlers.
-        setAll(list) {
-          list.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  let { error: signInError } = await supabase.auth.signInWithPassword({
-    email: adminEmail,
-    password: masterPassword,
-  });
-
-  if (signInError) {
-    const service = createServiceClient();
-
-    const { data: created, error: createErr } = await service.auth.admin.createUser({
-      email: adminEmail,
-      password: masterPassword,
-      email_confirm: true,
-    });
-
-    if (createErr) {
-      // Account already exists — password in Supabase is out of sync with env var, update it
-      const { data: listData } = await service.auth.admin.listUsers();
-      const existing = listData?.users.find(u => u.email === adminEmail);
-      if (existing) {
-        const { error: updateErr } = await service.auth.admin.updateUserById(existing.id, {
-          password: masterPassword,
-        });
-        if (updateErr) return { error: "Password sync failed: " + updateErr.message };
-      }
-    } else if (created?.user) {
-      await service.from("user_profiles").upsert({
-        id: created.user.id,
-        full_name: "Admin",
-        system_role: "agency_admin",
-      });
-    }
-
-    const { error: retryErr } = await supabase.auth.signInWithPassword({
-      email: adminEmail,
-      password: masterPassword,
-    });
-    if (retryErr) return { error: "Sign in failed: " + retryErr.message };
-  }
-
-  // Always ensure this user has agency_admin in user_profiles
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    const service = createServiceClient();
-    const { error: upsertErr } = await service.from("user_profiles").upsert(
-      { id: user.id, full_name: "Admin", system_role: "agency_admin" },
-      { onConflict: "id" } as any
-    );
-    if (upsertErr) console.error("[loginAction] user_profiles upsert failed:", upsertErr.message);
-  }
-
-  // Set a self-contained signed session cookie — verified locally by proxy.ts
-  // without any Supabase network call, so navigation never bounces to login.
+  // Set the custom session cookie immediately — password is correct, admin is in.
+  // This must happen BEFORE any Supabase work so a broken Supabase can never
+  // block the admin from logging in.
   const sessionToken = await signAdminSession(adminEmail, "agency_admin");
   cookieStore.set(COOKIE_NAME, sessionToken, {
     httpOnly: true,
@@ -98,4 +32,64 @@ export async function loginAction(
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });
+
+  // Best-effort: also sign into Supabase Auth so API routes that still use
+  // supabase.auth.getUser() continue to work. Failures here are non-fatal.
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll(); },
+          setAll(list) {
+            list.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
+    let { error: signInError } = await supabase.auth.signInWithPassword({
+      email: adminEmail,
+      password: masterPassword,
+    });
+
+    if (signInError) {
+      const service = createServiceClient();
+      const { data: created, error: createErr } = await service.auth.admin.createUser({
+        email: adminEmail,
+        password: masterPassword,
+        email_confirm: true,
+      });
+
+      if (createErr) {
+        const { data: listData } = await service.auth.admin.listUsers();
+        const existing = listData?.users.find(u => u.email === adminEmail);
+        if (existing) {
+          await service.auth.admin.updateUserById(existing.id, { password: masterPassword });
+        }
+      } else if (created?.user) {
+        await service.from("user_profiles").upsert({
+          id: created.user.id,
+          full_name: "Admin",
+          system_role: "agency_admin",
+        });
+      }
+
+      await supabase.auth.signInWithPassword({ email: adminEmail, password: masterPassword });
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const service = createServiceClient();
+      await service.from("user_profiles").upsert(
+        { id: user.id, full_name: "Admin", system_role: "agency_admin" },
+        { onConflict: "id" } as any
+      );
+    }
+  } catch (err) {
+    console.error("[loginAction] Supabase best-effort failed:", err);
+  }
 }

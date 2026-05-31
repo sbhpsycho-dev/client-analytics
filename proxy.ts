@@ -1,7 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { verifyAdminSession, COOKIE_NAME } from "@/lib/session";
+
+// Service-role Supabase client for proxy use — bypasses RLS, no auth session needed.
+function getServiceClient() {
+  return createServiceClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,13 +22,13 @@ export default async function proxy(request: NextRequest) {
   }
 
   // ── Step 1: Check local JWT session cookie (admin — zero network calls) ──
-  // lib/session.ts has NO next/headers import, so this is safe in proxy context.
   const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
   const adminSession = await verifyAdminSession(sessionToken);
 
   if (adminSession) {
     const { role } = adminSession;
 
+    // /admin/* — agency staff only
     if (pathname.startsWith("/admin")) {
       if (role !== "agency_admin" && role !== "agency_agent") {
         return NextResponse.redirect(new URL("/", request.url));
@@ -27,16 +36,32 @@ export default async function proxy(request: NextRequest) {
       return NextResponse.next({ request });
     }
 
+    // /clients/[tenant]/* — agency staff can access any tenant
     if (pathname.startsWith("/clients/")) {
       if (role === "agency_admin" || role === "agency_agent") {
         return NextResponse.next({ request });
       }
     }
 
-    // Root → send admin straight to /admin (no Supabase query needed here)
+    // Root → redirect admin to first active client dashboard (or /admin if none)
     if (pathname === "/") {
       if (role === "agency_admin" || role === "agency_agent") {
-        return NextResponse.redirect(new URL("/admin", request.url));
+        try {
+          const service = getServiceClient();
+          const { data: firstTenant } = await service
+            .from("tenants")
+            .select("slug")
+            .eq("status", "active")
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .single();
+          const dest = firstTenant?.slug
+            ? `/clients/${firstTenant.slug}`
+            : "/admin";
+          return NextResponse.redirect(new URL(dest, request.url));
+        } catch {
+          return NextResponse.redirect(new URL("/admin", request.url));
+        }
       }
     }
 
@@ -108,17 +133,10 @@ export default async function proxy(request: NextRequest) {
   if (pathname.startsWith("/clients/")) {
     const slug = pathname.split("/")[2];
     if (!slug) return response;
-
-    if (role === "agency_admin" || role === "agency_agent") {
-      return response;
-    }
+    if (role === "agency_admin" || role === "agency_agent") return response;
 
     const { data: tenant } = await supabase
-      .from("tenants")
-      .select("id")
-      .eq("slug", slug)
-      .single();
-
+      .from("tenants").select("id").eq("slug", slug).single();
     if (!tenant) return NextResponse.redirect(new URL("/", request.url));
 
     const { data: membership } = await supabase
@@ -128,7 +146,6 @@ export default async function proxy(request: NextRequest) {
       .eq("user_id", user.id)
       .eq("invite_status", "accepted")
       .single();
-
     if (!membership) return NextResponse.redirect(new URL("/", request.url));
 
     response.headers.set("x-tenant-role", membership.role);
@@ -137,7 +154,20 @@ export default async function proxy(request: NextRequest) {
 
   if (pathname === "/") {
     if (role === "agency_admin" || role === "agency_agent") {
-      return NextResponse.redirect(new URL("/admin", request.url));
+      try {
+        const service = getServiceClient();
+        const { data: firstTenant } = await service
+          .from("tenants")
+          .select("slug")
+          .eq("status", "active")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .single();
+        const dest = firstTenant?.slug ? `/clients/${firstTenant.slug}` : "/admin";
+        return NextResponse.redirect(new URL(dest, request.url));
+      } catch {
+        return NextResponse.redirect(new URL("/admin", request.url));
+      }
     }
     const { data: memberships } = await supabase
       .from("tenant_memberships")

@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminSession } from "@/lib/server-session";
 
-// Proxy handles role-based routing, but if a request reaches this page
-// (e.g. returnTo="/"), never send an authenticated user back to login.
+// Safety net: proxy handles routing, but if a request reaches this page,
+// check the custom session cookie before touching Supabase.
 export default async function RootPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/login");
   redirect("/admin");
 }

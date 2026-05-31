@@ -3,10 +3,12 @@ import { SignJWT, jwtVerify } from "jose";
 export const COOKIE_NAME = "leadwell_session";
 export const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+// Secret derived from always-present credentials — no separate env var needed.
 function getSecret() {
-  const raw = process.env.SHEET_TOKEN_SECRET;
-  if (!raw) throw new Error("SHEET_TOKEN_SECRET is not set");
-  return new TextEncoder().encode(raw);
+  const pw = process.env.MASTER_PASSWORD;
+  const em = process.env.ADMIN_EMAIL;
+  if (!pw || !em) throw new Error("MASTER_PASSWORD / ADMIN_EMAIL not configured");
+  return new TextEncoder().encode(`${pw}::${em}::leadwell_auth_v1`);
 }
 
 export interface AdminSession {
@@ -22,7 +24,7 @@ export async function signAdminSession(email: string, role: string): Promise<str
     .sign(getSecret());
 }
 
-// Safe to import anywhere including proxy.ts — no next/headers dependency.
+// Safe to import from proxy.ts — no next/headers dependency.
 export async function verifyAdminSession(token: string | undefined): Promise<AdminSession | null> {
   if (!token) return null;
   try {
