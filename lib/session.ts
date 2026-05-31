@@ -4,9 +4,13 @@ export const COOKIE_NAME = "leadwell_session";
 export const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 function getSecret() {
-  const s = process.env.SESSION_SECRET;
-  if (!s?.trim()) throw new Error("SESSION_SECRET not configured");
-  return new TextEncoder().encode(s);
+  const s = process.env.SESSION_SECRET?.trim();
+  if (s) return new TextEncoder().encode(s);
+  // Fallback: derive from MASTER_PASSWORD when SESSION_SECRET not yet configured
+  const pw = process.env.MASTER_PASSWORD?.trim();
+  const em = process.env.ADMIN_EMAIL?.trim();
+  if (!pw || !em) throw new Error("Auth not configured — set SESSION_SECRET or MASTER_PASSWORD+ADMIN_EMAIL");
+  return new TextEncoder().encode(`${pw}::${em}::leadwell_auth_v1`);
 }
 
 export interface AdminSession {
