@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { resolveTenantBySlug } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -21,9 +20,13 @@ export default async function ClientLayout({
   const tenantData = await resolveTenantBySlug(slug);
   if (!tenantData) redirect("/");
 
-  // Agency staff: NextAuth session. Client users: fall back to Supabase Auth.
-  const nextSession = await getServerSession(authOptions);
-  if (!nextSession) {
+  // Agency staff: check NextAuth cookie (avoids getServerSession crash in Next.js 16).
+  // Client users: fall back to Supabase Auth.
+  const cookieStore = await cookies();
+  const hasNextAuth =
+    !!cookieStore.get("next-auth.session-token") ||
+    !!cookieStore.get("__Secure-next-auth.session-token");
+  if (!hasNextAuth) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect("/login");
