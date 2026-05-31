@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { decode } from "next-auth/jwt";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -10,21 +10,43 @@ export interface AuthResult {
   error: string | null;
 }
 
-/**
- * Shared auth check for all /api/admin/** routes.
- * Checks NextAuth session first (agency admin/staff), then falls back to
- * Supabase Auth for backward-compat during the migration window.
- */
+function getSecret(): string {
+  return (
+    process.env.NEXTAUTH_SECRET ??
+    process.env.SESSION_SECRET ??
+    (process.env.MASTER_PASSWORD && process.env.ADMIN_EMAIL
+      ? `${process.env.MASTER_PASSWORD}::${process.env.ADMIN_EMAIL}::leadwell_auth_v1`
+      : "")
+  );
+}
+
 export async function requireAdminAuth(): Promise<AuthResult> {
   const service = createServiceClient();
 
-  // NextAuth session (primary: agency admin / staff login)
-  const session = await getServerSession(authOptions);
-  if (session) {
-    return { userId: session.user.email ?? "admin", email: session.user.email ?? null, service, error: null };
+  // Decode NextAuth JWT directly from cookie — avoids getServerSession compatibility
+  // issues with Next.js 16 App Router API routes.
+  const cookieStore = await cookies();
+  const tokenCookie =
+    cookieStore.get("next-auth.session-token") ??
+    cookieStore.get("__Secure-next-auth.session-token");
+
+  if (tokenCookie) {
+    try {
+      const decoded = await decode({ token: tokenCookie.value, secret: getSecret() });
+      if (decoded) {
+        return {
+          userId: (decoded.email as string) ?? "admin",
+          email: (decoded.email as string) ?? null,
+          service,
+          error: null,
+        };
+      }
+    } catch {
+      // Invalid token — fall through to Supabase
+    }
   }
 
-  // Supabase Auth fallback (legacy — remove once all clients migrate)
+  // Supabase Auth fallback (legacy client users with Supabase sessions)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { userId: null, email: null, service, error: "Unauthorized" };
@@ -35,7 +57,9 @@ export async function requireAdminAuth(): Promise<AuthResult> {
     .eq("id", user.id)
     .single();
 
-  const role = profile?.system_role ?? (user.email === process.env.ADMIN_EMAIL ? "agency_admin" : "client");
+  const role =
+    profile?.system_role ??
+    (user.email === process.env.ADMIN_EMAIL ? "agency_admin" : "client");
   if (!["agency_admin", "agency_agent"].includes(role)) {
     return { userId: null, email: null, service, error: "Forbidden" };
   }
