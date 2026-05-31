@@ -1,25 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { requireAdminAuth } from "@/lib/api-auth";
 
 const OPS_URL = process.env.APPS_SCRIPT_OPS_URL;
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const service = createServiceClient();
-  const { data: profile } = await service
-    .from("user_profiles")
-    .select("system_role")
-    .eq("id", user.id)
-    .single();
-  if (!["agency_admin", "agency_agent"].includes(profile?.system_role ?? "")) return null;
-  return user;
-}
-
 export async function GET() {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { error } = await requireAdminAuth();
+  if (error) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!OPS_URL) return NextResponse.json({ error: "APPS_SCRIPT_OPS_URL not configured" }, { status: 503 });
   try {
     const res = await fetch(OPS_URL, { next: { revalidate: 30 } });
@@ -31,7 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { error } = await requireAdminAuth();
+  if (error) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!OPS_URL) return NextResponse.json({ error: "APPS_SCRIPT_OPS_URL not configured" }, { status: 503 });
   try {
     const body = await req.json();
@@ -47,7 +34,8 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { error } = await requireAdminAuth();
+  if (error) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!OPS_URL) return NextResponse.json({ error: "APPS_SCRIPT_OPS_URL not configured" }, { status: 503 });
   try {
     const body = await req.json();

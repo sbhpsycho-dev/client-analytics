@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { isAgencyStaff } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

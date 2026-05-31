@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { isAgencyStaff } from "@/lib/auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getUser } from "@/lib/auth";
 
 export async function GET() {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const supabase = await createClient();
@@ -17,17 +18,17 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const user = await getUser();
   const { name, description, mapping } = await request.json();
   if (!name || !mapping) return NextResponse.json({ error: "name and mapping required" }, { status: 400 });
 
   const service = createServiceClient();
   const { data, error } = await service
     .from("mapping_templates")
-    .insert({ name, description, mapping, created_by: user?.id })
+    .insert({ name, description, mapping, created_by: session.user.email })
     .select()
     .single();
 

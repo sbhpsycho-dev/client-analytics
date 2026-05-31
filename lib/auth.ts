@@ -1,45 +1,41 @@
-import { createClient } from "@/lib/supabase/server";
-import type { Tables } from "@/types/database";
+import CredentialsProvider from "next-auth/providers/credentials";
+import type { NextAuthOptions } from "next-auth";
 
-export type SystemRole = "agency_admin" | "agency_agent" | "client";
-export type TenantRole = "client_owner" | "client_manager" | "client_setter" | "client_closer";
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "Password",
+      credentials: {
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const pw = credentials?.password?.trim();
+        if (!pw) return null;
 
-export async function getUser() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
-}
+        const masterPw = process.env.MASTER_PASSWORD?.trim();
+        const adminEmail = process.env.ADMIN_EMAIL?.trim();
+        if (!masterPw || !adminEmail) return null;
 
-export async function getUserProfile(): Promise<Tables<"user_profiles"> | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-  return data;
-}
+        if (pw !== masterPw) return null;
 
-export async function getUserTenants() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id, role, tenants(id, slug, name, logo_url, brand_color, default_theme, status)")
-    .eq("user_id", user.id)
-    .eq("invite_status", "accepted");
-  return data ?? [];
-}
-
-export async function isAgencyStaff(): Promise<boolean> {
-  const profile = await getUserProfile();
-  return profile?.system_role === "agency_admin" || profile?.system_role === "agency_agent";
-}
-
-export async function isAgencyAdmin(): Promise<boolean> {
-  const profile = await getUserProfile();
-  return profile?.system_role === "agency_admin";
-}
+        return { id: "admin", name: "Admin", email: adminEmail, role: "admin" };
+      },
+    }),
+  ],
+  // Fall back to SESSION_SECRET so existing deployments work without new env var
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.SESSION_SECRET,
+  pages: { signIn: "/login" },
+  session: { strategy: "jwt" },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = (user as { role: string }).role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.user.role = token.role as string;
+      return session;
+    },
+  },
+};

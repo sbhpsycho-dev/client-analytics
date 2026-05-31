@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { requireAdminAuth } from "@/lib/api-auth";
 import { google } from "googleapis";
 import { randomBytes, pbkdf2Sync } from "crypto";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const service = createServiceClient();
-  const { data: profile } = await service
-    .from("user_profiles")
-    .select("system_role")
-    .eq("id", user.id)
-    .single();
-  if (!["agency_admin", "agency_agent"].includes(profile?.system_role ?? "")) return null;
-  return user;
+  const { error } = await requireAdminAuth();
+  return error === null;
 }
 
 // ─── Password ─────────────────────────────────────────────────────────────────

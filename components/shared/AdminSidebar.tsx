@@ -2,21 +2,48 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
+  Trophy,
+  Calendar,
   Users,
+  MessageSquare,
+  BookOpen,
+  TrendingUp,
+  BarChart3,
+  Megaphone,
+  Receipt,
+  DollarSign,
   RefreshCw,
   ScrollText,
-  BarChart3,
+  UsersRound,
   ChevronRight,
 } from "lucide-react";
 
-const navItems = [
-  { href: "/admin", label: "Clients", icon: LayoutDashboard, exact: true },
-  { href: "/admin/sync-status", label: "Sync Status", icon: RefreshCw },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/logs", label: "Logs", icon: ScrollText },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  exact?: boolean;
+  adminOnly?: boolean;
+  staffOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
+  { href: "/admin",              label: "Leaderboard",  icon: Trophy,      exact: true },
+  { href: "/admin/calendar",     label: "Calendar",     icon: Calendar },
+  { href: "/admin/clients",      label: "Clients",      icon: Users },
+  { href: "/admin/messages",     label: "Messages",     icon: MessageSquare },
+  { href: "/admin/resources",    label: "Resources",    icon: BookOpen },
+  { href: "/admin/my-numbers",   label: "My Numbers",   icon: TrendingUp,   staffOnly: true },
+  { href: "/admin/insights",     label: "Insights",     icon: BarChart3 },
+  { href: "/admin/ads",          label: "Ad Scorecard", icon: Megaphone,    adminOnly: true },
+  { href: "/admin/expenses",     label: "Expenses",     icon: Receipt,      adminOnly: true },
+  { href: "/admin/payouts",      label: "Payouts",      icon: DollarSign,   adminOnly: true },
+  { href: "/admin/sync-status",  label: "Sync Status",  icon: RefreshCw,    adminOnly: true },
+  { href: "/admin/logs",         label: "Logs",         icon: ScrollText,   adminOnly: true },
+  { href: "/admin/users",        label: "Users",        icon: UsersRound,   adminOnly: true },
 ];
 
 export function AdminSidebar() {
@@ -25,7 +52,6 @@ export function AdminSidebar() {
   const NAVY_BORDER = "rgba(180,210,240,0.08)";
   const NAVY_ACTIVE_BG = "rgba(42,68,114,0.5)";
   const NAVY_HOVER_BG = "rgba(42,68,114,0.25)";
-  const SILVER_ACCENT = "#1e3a6e";
 
   return (
     <aside
@@ -53,7 +79,7 @@ export function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 p-3">
+      <nav className="flex-1 space-y-0.5 p-3 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -87,15 +113,15 @@ export function AdminSidebar() {
 
       {/* Footer */}
       <div className="p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
-        <Link
-          href="/api/auth/signout"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors w-full text-left"
           style={{ color: "#3a5a7a" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#7a9ab8"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#3a5a7a"; }}
         >
           Sign out
-        </Link>
+        </button>
       </div>
     </aside>
   );

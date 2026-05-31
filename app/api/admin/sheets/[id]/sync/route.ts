@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAgencyStaff } from "@/lib/auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { orchestrateSyncForTenant } from "@/lib/sync/engine";
 
@@ -7,7 +8,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id } = await params;

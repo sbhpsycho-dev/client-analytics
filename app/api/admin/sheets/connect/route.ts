@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { getOAuthUrl } from "@/lib/google/oauth";
-import { isAgencyStaff } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  if (!(await isAgencyStaff())) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { tenantId } = await request.json();

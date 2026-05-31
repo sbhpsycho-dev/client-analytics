@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { getAdminSession } from "@/lib/server-session";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
-// Safety net: proxy handles routing, but if a request reaches this page,
-// check the custom session cookie before touching Supabase.
 export default async function RootPage() {
-  const session = await getAdminSession();
+  const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
   redirect("/admin");
 }

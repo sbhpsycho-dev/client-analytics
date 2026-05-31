@@ -3,13 +3,14 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useTransition } from "react";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { loginAction } from "@/app/actions/auth";
 
 const ERROR_MESSAGES: Record<string, string> = {
+  CredentialsSignin: "Incorrect password",
   invalid_invite: "This invite link is invalid.",
   invite_expired: "This invite has already been used or expired.",
   invite_wrong_account: "Please log in with the email address this invite was sent to.",
@@ -22,22 +23,20 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get("error");
-    if (err && ERROR_MESSAGES[err]) toast.error(ERROR_MESSAGES[err]);
+    if (err) toast.error(ERROR_MESSAGES[err] ?? "Login failed");
   }, []);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    const raw = new URLSearchParams(window.location.search).get("returnTo") || "/";
-    const returnTo = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+    const raw = new URLSearchParams(window.location.search).get("callbackUrl") || "/admin";
+    const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
     startTransition(async () => {
-      const result = await loginAction(password, returnTo);
-      if (result?.error) {
-        toast.error(result.error === "Incorrect password" ? "Incorrect password" : "Login failed — check server config");
+      const result = await signIn("credentials", { password, redirect: false });
+      if (!result?.ok || result?.error) {
+        toast.error("Incorrect password");
         return;
       }
-      // Hard reload so the browser sends all fresh session cookies in the next request.
-      // Only follow relative paths — guard against open redirect via ?returnTo=https://evil.com
-      window.location.href = returnTo;
+      window.location.href = callbackUrl;
     });
   }
 

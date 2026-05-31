@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { resolveTenantBySlug } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getAdminSession } from "@/lib/server-session";
 import { ClientSidebar } from "@/components/shared/ClientSidebar";
 import { ClientTopNav, MobileBottomBar } from "@/components/shared/ClientTopNav";
 import { MobileNav } from "@/components/shared/MobileNav";
@@ -20,10 +21,9 @@ export default async function ClientLayout({
   const tenantData = await resolveTenantBySlug(slug);
   if (!tenantData) redirect("/");
 
-  // Admin: verify custom session cookie (no network call)
-  // Client users: fall back to Supabase Auth
-  const adminSession = await getAdminSession();
-  if (!adminSession) {
+  // Agency staff: NextAuth session. Client users: fall back to Supabase Auth.
+  const nextSession = await getServerSession(authOptions);
+  if (!nextSession) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect("/login");
