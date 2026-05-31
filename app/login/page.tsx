@@ -42,8 +42,10 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/clients/leadwell");
-    router.refresh();
+    // Hard redirect so new Supabase session cookies are sent on the next request.
+    // Soft router.push keeps stale cookie state and middleware sees the user as logged out.
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo") || "/";
+    window.location.href = returnTo;
   }
 
   return (

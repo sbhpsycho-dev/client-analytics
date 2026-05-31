@@ -74,7 +74,8 @@ export default async function middleware(request: NextRequest) {
   // /admin/* — agency staff only
   if (pathname.startsWith("/admin")) {
     if (role !== "agency_admin" && role !== "agency_agent") {
-      return NextResponse.redirect(new URL("/login", request.url));
+      // Authenticated but wrong role — send home, not to login
+      return NextResponse.redirect(new URL("/", request.url));
     }
     return response;
   }
@@ -95,7 +96,8 @@ export default async function middleware(request: NextRequest) {
       .single();
 
     if (!tenant) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      // Authenticated but no matching tenant — send home
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     const { data: membership } = await supabase
@@ -107,7 +109,8 @@ export default async function middleware(request: NextRequest) {
       .single();
 
     if (!membership) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      // Authenticated but no membership for this tenant — send home
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     response.headers.set("x-tenant-role", membership.role);
