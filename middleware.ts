@@ -143,7 +143,7 @@ export default async function middleware(request: NextRequest) {
     if (firstSlug) {
       return NextResponse.redirect(new URL(`/clients/${firstSlug}`, request.url));
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   return response;

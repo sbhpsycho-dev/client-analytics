@@ -16,7 +16,7 @@ export default async function ClientLayout({
 }) {
   const { tenant: slug } = await params;
   const tenantData = await resolveTenantBySlug(slug);
-  if (!tenantData) redirect("/login");
+  if (!tenantData) redirect("/");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

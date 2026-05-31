@@ -81,10 +81,11 @@ export async function loginAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
     const service = createServiceClient();
-    await service.from("user_profiles").upsert(
+    const { error: upsertErr } = await service.from("user_profiles").upsert(
       { id: user.id, full_name: "Admin", system_role: "agency_admin" },
       { onConflict: "id" } as any
     );
+    if (upsertErr) console.error("[loginAction] user_profiles upsert failed:", upsertErr.message);
   }
 
   // Session cookies are fully committed to the response at this point.
