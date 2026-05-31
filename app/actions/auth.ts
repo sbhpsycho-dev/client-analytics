@@ -2,13 +2,12 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function loginAction(
   password: string,
   returnTo: string = "/"
-): Promise<{ error: string }> {
+): Promise<{ error: string } | void> {
   const masterPassword = process.env.MASTER_PASSWORD;
   const adminEmail     = process.env.ADMIN_EMAIL;
 
@@ -88,7 +87,6 @@ export async function loginAction(
     if (upsertErr) console.error("[loginAction] user_profiles upsert failed:", upsertErr.message);
   }
 
-  // Session cookies are fully committed to the response at this point.
-  // redirect() triggers the navigation server-side with the session already established.
-  redirect(returnTo);
+  // Cookies are committed to the Server Action response.
+  // The client handles navigation via window.location.href (hard reload).
 }

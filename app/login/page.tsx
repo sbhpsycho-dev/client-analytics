@@ -32,8 +32,10 @@ export default function LoginPage() {
       const result = await loginAction(password, returnTo);
       if (result?.error) {
         toast.error(result.error === "Incorrect password" ? "Incorrect password" : "Login failed — check server config");
+        return;
       }
-      // On success, loginAction calls redirect() server-side — no client navigation needed
+      // Hard reload so the browser sends all fresh session cookies in the next request
+      window.location.href = returnTo;
     });
   }
 
