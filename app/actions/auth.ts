@@ -27,7 +27,12 @@ export async function loginAction(
   // Set the custom session cookie immediately — password is correct, admin is in.
   // This must happen BEFORE any Supabase work so a broken Supabase can never
   // block the admin from logging in.
-  const sessionToken = await signAdminSession(adminEmail, "agency_admin");
+  let sessionToken: string;
+  try {
+    sessionToken = await signAdminSession(adminEmail, "agency_admin");
+  } catch {
+    return { error: "Server not configured" };
+  }
   cookieStore.set(COOKIE_NAME, sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
