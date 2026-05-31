@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { resolveTenantBySlug } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getAdminSession } from "@/lib/session";
 import { ClientSidebar } from "@/components/shared/ClientSidebar";
 import { ClientTopNav, MobileBottomBar } from "@/components/shared/ClientTopNav";
 import { MobileNav } from "@/components/shared/MobileNav";
@@ -18,11 +20,17 @@ export default async function ClientLayout({
   const tenantData = await resolveTenantBySlug(slug);
   if (!tenantData) redirect("/");
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Admin: verify custom session cookie (no network call)
+  // Client users: fall back to Supabase Auth
+  const adminSession = await getAdminSession();
+  if (!adminSession) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) redirect("/login");
+  }
 
-  const { data: conn } = await supabase
+  const service = createServiceClient();
+  const { data: conn } = await service
     .from("sheet_connections" as any)
     .select("last_sync_status")
     .eq("tenant_id", tenantData.id)

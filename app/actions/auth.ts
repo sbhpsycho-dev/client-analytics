@@ -3,6 +3,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/service";
+import { signAdminSession, COOKIE_NAME, COOKIE_MAX_AGE } from "@/lib/session";
 
 export async function loginAction(
   password: string,
@@ -87,6 +88,14 @@ export async function loginAction(
     if (upsertErr) console.error("[loginAction] user_profiles upsert failed:", upsertErr.message);
   }
 
-  // Cookies are committed to the Server Action response.
-  // The client handles navigation via window.location.href (hard reload).
+  // Set a self-contained signed session cookie — verified locally by proxy.ts
+  // without any Supabase network call, so navigation never bounces to login.
+  const sessionToken = await signAdminSession(adminEmail, "agency_admin");
+  cookieStore.set(COOKIE_NAME, sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
 }
