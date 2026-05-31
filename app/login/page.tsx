@@ -2,12 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { loginAction } from "@/app/actions/auth";
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_invite: "This invite link is invalid.",
@@ -17,8 +17,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,26 +25,16 @@ export default function LoginPage() {
     if (err && ERROR_MESSAGES[err]) toast.error(ERROR_MESSAGES[err]);
   }, []);
 
-  async function handleLogin(e: React.FormEvent) {
+  function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-
-    if (!res.ok) {
-      toast.error("Incorrect password");
-      setLoading(false);
-      return;
-    }
-
-    // Hard redirect so new Supabase session cookies are sent on the next request.
-    // Soft router.push keeps stale cookie state and middleware sees the user as logged out.
     const returnTo = new URLSearchParams(window.location.search).get("returnTo") || "/";
-    window.location.href = returnTo;
+    startTransition(async () => {
+      const result = await loginAction(password, returnTo);
+      if (result?.error) {
+        toast.error(result.error === "Incorrect password" ? "Incorrect password" : "Login failed — check server config");
+      }
+      // On success, loginAction calls redirect() server-side — no client navigation needed
+    });
   }
 
   return (
@@ -173,7 +162,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full h-12 font-semibold tracking-wide rounded-xl text-sm"
-              disabled={loading}
+              disabled={isPending}
               style={{
                 background: "linear-gradient(135deg, #1e3a6e 0%, #2a4f8a 50%, #1e3f7a 100%)",
                 border: "1px solid rgba(180,210,240,0.18)",
@@ -181,7 +170,7 @@ export default function LoginPage() {
                 boxShadow: "0 4px 20px rgba(26,50,110,0.45), inset 0 1px 0 rgba(255,255,255,0.08)",
               }}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
             </Button>
           </form>
         </div>
