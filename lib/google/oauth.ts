@@ -1,4 +1,4 @@
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
+const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 export function getOAuthUrl(state: string): string {
   const params = new URLSearchParams({

@@ -1,3 +1,24 @@
+export async function sheetsAppend(
+  accessToken: string,
+  spreadsheetId: string,
+  range: string,
+  values: string[][]
+): Promise<void> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ values }),
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    throw new Error(`Sheets append error ${res.status}: ${json.error?.message ?? JSON.stringify(json.error)}`);
+  }
+}
+
 export async function sheetsGet(accessToken: string, spreadsheetId: string, range: string) {
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`,

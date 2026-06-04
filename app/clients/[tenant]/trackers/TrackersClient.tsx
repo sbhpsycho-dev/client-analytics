@@ -6,10 +6,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ArrowRight, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
 import { MOCK, TEAM_ROSTER, PERIOD_LABELS, type Period, type KpiValue } from "./mockData";
 
-// ─── Shared design tokens ─────────────────────────────────────────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
 
 const CARD: React.CSSProperties = {
   background: "linear-gradient(135deg, rgba(17,27,46,0.95) 0%, rgba(11,19,34,0.98) 100%)",
@@ -17,9 +17,15 @@ const CARD: React.CSSProperties = {
   boxShadow: "0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(180,210,240,0.05)",
 };
 
+const GOLD_CARD: React.CSSProperties = {
+  background: "linear-gradient(135deg, rgba(30,24,8,0.98) 0%, rgba(20,16,4,0.99) 100%)",
+  border: "1px solid rgba(252,211,77,0.15)",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(252,211,77,0.08)",
+};
+
 const fmt$ = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-const CHART_TOOLTIP_STYLE = {
+const CHART_TOOLTIP = {
   contentStyle: {
     background: "#0d1828",
     border: "1px solid rgba(180,210,240,0.12)",
@@ -30,23 +36,23 @@ const CHART_TOOLTIP_STYLE = {
   cursor: { stroke: "rgba(180,210,240,0.1)", strokeWidth: 1 },
 };
 
-// ─── Primitive helpers ────────────────────────────────────────────────────────
+// ─── Primitives ───────────────────────────────────────────────────────────────
 
-function Delta({ kpi, unit }: { kpi: KpiValue; unit?: string }) {
+function Delta({ kpi }: { kpi: KpiValue }) {
   if (kpi.delta === null) return null;
   const isUp = kpi.delta > 0;
   const isDown = kpi.delta < 0;
   const color = isUp ? "#4ade80" : isDown ? "#f87171" : "#7a9ab8";
   const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-  const label = kpi.unit === "usd"
-    ? `${isUp ? "+" : ""}${kpi.delta.toFixed(1)}%`
-    : kpi.unit === "count"
-    ? `${isUp ? "+" : ""}${kpi.delta} vs last mo`
-    : `${isUp ? "+" : ""}${Math.abs(kpi.delta).toFixed(1)} pts`;
+  const abs = Math.abs(kpi.delta);
+  const label =
+    kpi.unit === "usd"   ? `${isUp ? "+" : ""}${kpi.delta.toFixed(1)}%` :
+    kpi.unit === "count" ? `${isUp ? "+" : ""}${kpi.delta} vs last mo` :
+                           `${isUp ? "+" : isDown ? "-" : ""}${abs.toFixed(1)} pts`;
   return (
     <span className="flex items-center gap-0.5 text-[11px] font-semibold" style={{ color }}>
       <Icon className="h-3 w-3" />
-      {isDown && kpi.unit !== "usd" ? `-${Math.abs(kpi.delta).toFixed(1)} pts` : label}
+      {label}
     </span>
   );
 }
@@ -68,37 +74,69 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 }
 
 function formatValue(kpi: KpiValue): string {
-  if (kpi.unit === "usd") return fmt$.format(kpi.value);
-  if (kpi.unit === "pct") return `${kpi.value}%`;
+  if (kpi.unit === "usd")   return fmt$.format(kpi.value);
+  if (kpi.unit === "pct")   return `${kpi.value}%`;
   return kpi.value.toLocaleString();
 }
 
-// ─── KPI Card (for detail views) ─────────────────────────────────────────────
+// ─── KPI card ─────────────────────────────────────────────────────────────────
 
-function KpiCard({ label, kpi, accentColor }: { label: string; kpi: KpiValue; accentColor: string }) {
+function KpiCard({ label, kpi, accentColor, gold }: { label: string; kpi: KpiValue; accentColor: string; gold?: boolean }) {
   return (
     <div
-      className="rounded-xl p-5 transition-all duration-200 hover:brightness-110"
+      className="rounded-xl p-5 transition-all duration-200 hover:brightness-110 cursor-default"
       style={{
-        ...CARD,
+        ...(gold ? GOLD_CARD : CARD),
         borderLeft: `3px solid ${accentColor}`,
       }}
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-3" style={{ color: `${accentColor}cc` }}>
         {label}
       </p>
-      <p className="text-3xl font-black tabular-nums leading-none" style={{ color: "#dce8f4" }}>
+      <p className="text-3xl font-black tabular-nums leading-none" style={{ color: gold ? "#fcd34d" : "#dce8f4" }}>
         {formatValue(kpi)}
       </p>
       {kpi.unit === "pct" && <ProgressBar value={kpi.value} color={accentColor} />}
+      <div className="mt-2.5"><Delta kpi={kpi} /></div>
+    </div>
+  );
+}
+
+// ─── Revenue spotlight tile ───────────────────────────────────────────────────
+
+function RevenueTile({ label, kpi }: { label: string; kpi: KpiValue }) {
+  const isUp = kpi.delta !== null && kpi.delta > 0;
+  const isDown = kpi.delta !== null && kpi.delta < 0;
+  return (
+    <div
+      className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] cursor-default"
+      style={{
+        ...GOLD_CARD,
+        borderLeft: "3px solid #fcd34d",
+      }}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-3" style={{ color: "rgba(252,211,77,0.7)" }}>
+        {label}
+      </p>
+      <p className="text-3xl font-black tabular-nums leading-none" style={{ color: "#fcd34d" }}>
+        {formatValue(kpi)}
+      </p>
       <div className="mt-2.5">
-        <Delta kpi={kpi} />
+        {kpi.delta !== null && (
+          <span
+            className="flex items-center gap-0.5 text-[11px] font-semibold"
+            style={{ color: isUp ? "#4ade80" : isDown ? "#f87171" : "#7a9ab8" }}
+          >
+            {isUp ? <TrendingUp className="h-3 w-3" /> : isDown ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+            {kpi.unit === "usd" ? `+${kpi.delta}%` : `+${kpi.delta} vs last mo`} vs prev period
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Sample data banner ───────────────────────────────────────────────────────
+// ─── Sample banner ────────────────────────────────────────────────────────────
 
 function SampleBanner() {
   return (
@@ -106,17 +144,17 @@ function SampleBanner() {
       className="rounded-lg px-4 py-2.5 text-xs font-medium flex items-center gap-2"
       style={{
         background: "rgba(120,80,10,0.2)",
-        border: "1px solid rgba(245,158,11,0.25)",
+        border: "1px solid rgba(245,158,11,0.35)",
         color: "#fcd34d",
       }}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0 animate-pulse" />
       Sample data — placeholders until your CRM data is wired in
     </div>
   );
 }
 
-// ─── Person header (for detail views) ────────────────────────────────────────
+// ─── Person header ────────────────────────────────────────────────────────────
 
 function PersonHeader({ name, role, color, subtitle }: { name: string; role: string; color: string; subtitle?: string }) {
   return (
@@ -158,7 +196,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-// ─── Chart wrappers ───────────────────────────────────────────────────────────
+// ─── Chart card ───────────────────────────────────────────────────────────────
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -172,43 +210,51 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
   );
 }
 
-// ─── OVERVIEW VIEW ────────────────────────────────────────────────────────────
+// ─── OVERVIEW ─────────────────────────────────────────────────────────────────
 
 function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
-  const kpis: { label: string; key: keyof typeof MOCK.overview }[] = [
+  const ov = MOCK.overview;
+
+  const perfKpis: { label: string; key: keyof typeof ov }[] = [
     { label: "Team Close Rate",      key: "teamCloseRate" },
     { label: "Team Show-Up Rate",    key: "teamShowUpRate" },
     { label: "Customer Retention",   key: "customerRetention" },
     { label: "Appointments Booked",  key: "appointmentsBooked" },
     { label: "Team Conversion Rate", key: "teamConversionRate" },
-    { label: "Average Deal Size",    key: "avgDealSize" },
     { label: "Training Completion",  key: "trainingCompletion" },
-    { label: "Onboarding Completion",key: "onboardingCompletion" },
   ];
 
   return (
     <div className="space-y-8">
       <SampleBanner />
 
-      {/* Headline KPI tiles */}
+      {/* ── Revenue spotlight ── */}
+      <div className="space-y-3">
+        <SectionHeader title="High-ticket sales · this period" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <RevenueTile label="Total Cash Collected" kpi={ov.totalCashCollected} />
+          <RevenueTile label="Total Deals Closed"   kpi={ov.totalDealsClosed} />
+        </div>
+      </div>
+
+      {/* ── Performance KPIs ── */}
       <div className="space-y-3">
         <SectionHeader title="Team headline metrics this month" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {kpis.map(({ label, key }) => {
-            const kpi = MOCK.overview[key];
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {perfKpis.map(({ label, key }) => {
+            const kpi = ov[key];
             const isUp = kpi.delta !== null && kpi.delta > 0;
             const isDown = kpi.delta !== null && kpi.delta < 0;
-            const fmtVal = formatValue(kpi);
             return (
               <div
                 key={key}
-                className="rounded-xl p-4 transition-all duration-200 hover:scale-[1.02]"
+                className="rounded-xl p-4 transition-all duration-200 hover:scale-[1.02] cursor-default"
                 style={CARD}
               >
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: "#5a7a9a" }}>
                   {label}
                 </p>
-                <p className="text-2xl font-black tabular-nums leading-none text-white">{fmtVal}</p>
+                <p className="text-2xl font-black tabular-nums leading-none text-white">{formatValue(kpi)}</p>
                 {kpi.unit === "pct" && (
                   <ProgressBar value={kpi.value} color={isDown ? "#f87171" : isUp ? "#4ade80" : "#4a7ab5"} />
                 )}
@@ -219,11 +265,7 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
                       style={{ color: isUp ? "#4ade80" : isDown ? "#f87171" : "#7a9ab8" }}
                     >
                       {isUp ? <TrendingUp className="h-3 w-3" /> : isDown ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                      {kpi.unit === "count"
-                        ? `+${kpi.delta} vs last mo`
-                        : kpi.unit === "usd"
-                        ? `+${kpi.delta}%`
-                        : `${isUp ? "+" : ""}${Math.abs(kpi.delta).toFixed(1)} pts`}
+                      {kpi.unit === "count" ? `+${kpi.delta} vs last mo` : kpi.unit === "usd" ? `+${kpi.delta}%` : `${isUp ? "+" : ""}${Math.abs(kpi.delta!).toFixed(1)} pts`}
                     </span>
                   )}
                 </div>
@@ -233,22 +275,19 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
         </div>
       </div>
 
-      {/* Role summary cards */}
+      {/* ── Role summary cards ── */}
       <div className="space-y-3">
         <SectionHeader title="By role — click a card to drill in" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
 
-          {/* Sales Director */}
           <button
             onClick={() => onNavigate("director")}
             className="rounded-xl p-5 text-left transition-all duration-200 hover:scale-[1.02] hover:brightness-110 group"
             style={{ ...CARD, borderTop: `3px solid ${TEAM_ROSTER.director.color}` }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div
-                className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
-                style={{ background: `${TEAM_ROSTER.director.color}30`, border: `1px solid ${TEAM_ROSTER.director.color}50` }}
-              >
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: `${TEAM_ROSTER.director.color}30`, border: `1px solid ${TEAM_ROSTER.director.color}50` }}>
                 H
               </div>
               <div>
@@ -257,14 +296,10 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
               </div>
             </div>
             <div className="space-y-2 mb-4">
-              {[
-                ["Team Close Rate", "32%"],
-                ["Show-Up Rate", "71%"],
-                ["Avg Deal Size", "$6,290"],
-              ].map(([l, v]) => (
+              {[["Team Revenue", fmt$.format(73200)], ["Close Rate", "32%"], ["Avg Deal Size", "$6,290"]].map(([l, v]) => (
                 <div key={l} className="flex justify-between items-center py-1.5" style={{ borderBottom: "1px solid rgba(180,210,240,0.06)" }}>
                   <span className="text-xs" style={{ color: "#7a9ab8" }}>{l}</span>
-                  <span className="text-xs font-bold text-white">{v}</span>
+                  <span className="text-xs font-bold" style={{ color: l === "Team Revenue" ? "#fcd34d" : "white" }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -273,17 +308,14 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
             </span>
           </button>
 
-          {/* Setters */}
           <button
             onClick={() => onNavigate("setters")}
             className="rounded-xl p-5 text-left transition-all duration-200 hover:scale-[1.02] hover:brightness-110 group"
             style={{ ...CARD, borderTop: "3px solid #1D9E75" }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div
-                className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
-                style={{ background: "rgba(29,158,117,0.2)", border: "1px solid rgba(29,158,117,0.4)" }}
-              >
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: "rgba(29,158,117,0.2)", border: "1px solid rgba(29,158,117,0.4)" }}>
                 3
               </div>
               <div>
@@ -292,14 +324,10 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
               </div>
             </div>
             <div className="space-y-2 mb-4">
-              {[
-                ["Appointments", "103"],
-                ["Avg Show Rate", "71%"],
-                ["Avg Conversion", "29%"],
-              ].map(([l, v]) => (
+              {[["Cash Collected", fmt$.format(73200)], ["Deals Closed", "11"], ["Avg Show Rate", "71%"]].map(([l, v]) => (
                 <div key={l} className="flex justify-between items-center py-1.5" style={{ borderBottom: "1px solid rgba(180,210,240,0.06)" }}>
                   <span className="text-xs" style={{ color: "#7a9ab8" }}>{l}</span>
-                  <span className="text-xs font-bold text-white">{v}</span>
+                  <span className="text-xs font-bold" style={{ color: l === "Cash Collected" ? "#fcd34d" : "white" }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -308,17 +336,14 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
             </span>
           </button>
 
-          {/* VA & Ops */}
           <button
             onClick={() => onNavigate("va")}
             className="rounded-xl p-5 text-left transition-all duration-200 hover:scale-[1.02] hover:brightness-110 group"
             style={{ ...CARD, borderTop: `3px solid ${TEAM_ROSTER.va.color}` }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div
-                className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
-                style={{ background: `${TEAM_ROSTER.va.color}25`, border: `1px solid ${TEAM_ROSTER.va.color}45` }}
-              >
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: `${TEAM_ROSTER.va.color}25`, border: `1px solid ${TEAM_ROSTER.va.color}45` }}>
                 C
               </div>
               <div>
@@ -327,11 +352,7 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
               </div>
             </div>
             <div className="space-y-2 mb-4">
-              {[
-                ["Contract Completion", "91%"],
-                ["Student Response", "78%"],
-                ["Onboarding", "86%"],
-              ].map(([l, v]) => (
+              {[["Contract Completion", "91%"], ["Student Response", "78%"], ["Onboarding", "86%"]].map(([l, v]) => (
                 <div key={l} className="flex justify-between items-center py-1.5" style={{ borderBottom: "1px solid rgba(180,210,240,0.06)" }}>
                   <span className="text-xs" style={{ color: "#7a9ab8" }}>{l}</span>
                   <span className="text-xs font-bold text-white">{v}</span>
@@ -345,15 +366,27 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
         </div>
       </div>
 
-      {/* Charts */}
+      {/* ── Charts ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ChartCard title="Monthly Revenue Trend" subtitle="Total cash collected · last 6 weeks">
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
+              <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip {...CHART_TOOLTIP} formatter={(v) => [fmt$.format(Number(v)), "Revenue"]} />
+              <Line type="monotone" dataKey="revenue" stroke="#fcd34d" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: "#fcd34d" }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
         <ChartCard title="Setter Output" subtitle="Appointments booked by setter · last 6 weeks">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
               <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip {...CHART_TOOLTIP_STYLE} />
+              <Tooltip {...CHART_TOOLTIP} />
               <Legend wrapperStyle={{ fontSize: 11, color: "#7a9ab8", paddingTop: 8 }} />
               <Bar dataKey="sylis"  name="Sylis"  fill="#1D9E75" radius={[3,3,0,0]} />
               <Bar dataKey="izaiah" name="Izaiah" fill="#D8843A" radius={[3,3,0,0]} />
@@ -361,66 +394,58 @@ function OverviewView({ onNavigate }: { onNavigate: (view: string) => void }) {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-
-        <ChartCard title="Team Close Rate" subtitle="Last 6 weeks">
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
-              <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} domain={[20, 40]} unit="%" />
-              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v) => [`${v}%`, "Close Rate"]} />
-              <Line type="monotone" dataKey="closeRate" stroke="#3B6FB5" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: "#3B6FB5" }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
       </div>
     </div>
   );
 }
 
-// ─── SALES DIRECTOR VIEW ──────────────────────────────────────────────────────
+// ─── SALES DIRECTOR ───────────────────────────────────────────────────────────
 
 function DirectorView() {
   const d = MOCK.director;
   const c = TEAM_ROSTER.director.color;
-
-  const kpis: { label: string; kpi: KpiValue }[] = [
-    { label: "Team Show-Up Rate",      kpi: d.showUpRate },
-    { label: "Team Close Rate",        kpi: d.closeRate },
-    { label: "Customer Retention Rate",kpi: d.customerRetention },
-    { label: "Training Completion Rate",kpi: d.trainingCompletion },
-    { label: "Average Deal Size",      kpi: d.avgDealSize },
-  ];
 
   return (
     <div className="space-y-8">
       <SampleBanner />
       <PersonHeader name="Harneet" role="Sales Director" color={c} subtitle="LeadWell leadership KPIs" />
 
-      {/* KPI cards */}
+      {/* Revenue spotlight */}
       <div className="space-y-3">
-        <SectionHeader title="KPI scorecard" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {kpis.map(({ label, kpi }) => (
-            <KpiCard key={label} label={label} kpi={kpi} accentColor={c} />
-          ))}
+        <SectionHeader title="High-ticket revenue" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <RevenueTile label="Team Cash Collected"  kpi={d.teamRevenue} />
+          <RevenueTile label="Total Deals Closed"   kpi={d.totalDealsClosed} />
         </div>
       </div>
 
-      {/* Trend charts */}
+      {/* KPI scorecard */}
+      <div className="space-y-3">
+        <SectionHeader title="KPI scorecard" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <KpiCard label="Team Show-Up Rate"       kpi={d.showUpRate}        accentColor={c} />
+          <KpiCard label="Team Close Rate"         kpi={d.closeRate}         accentColor={c} />
+          <KpiCard label="Customer Retention Rate" kpi={d.customerRetention} accentColor={c} />
+          <KpiCard label="Training Completion"     kpi={d.trainingCompletion} accentColor={c} />
+          <KpiCard label="Average Deal Size"       kpi={d.avgDealSize}       accentColor="#fcd34d" gold />
+        </div>
+      </div>
+
+      {/* Trends */}
       <div className="space-y-3">
         <SectionHeader title="Trends · last 6 weeks" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard title="Close Rate vs Show-Up Rate" subtitle="6-week comparison">
+          <ChartCard title="Revenue vs Close Rate" subtitle="6-week comparison">
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+              <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
                 <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
-                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v, name) => [`${v}%`, name === "closeRate" ? "Close Rate" : "Show-Up Rate"]} />
-                <Legend wrapperStyle={{ fontSize: 11, color: "#7a9ab8", paddingTop: 8 }} formatter={(v) => v === "closeRate" ? "Close Rate" : "Show-Up Rate"} />
-                <Line type="monotone" dataKey="closeRate"  stroke={c}       strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-                <Line type="monotone" dataKey="showUpRate" stroke="#4ade80" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} strokeDasharray="5 3" />
+                <YAxis yAxisId="left"  tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[20, 40]} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                <Tooltip {...CHART_TOOLTIP} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "#7a9ab8", paddingTop: 8 }} />
+                <Line yAxisId="left"  type="monotone" dataKey="closeRate" name="Close Rate" stroke={c} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                <Line yAxisId="right" type="monotone" dataKey="revenue"   name="Revenue"    stroke="#fcd34d" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} strokeDasharray="5 3" />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -430,8 +455,8 @@ function DirectorView() {
               <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
                 <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(1)}k`} />
-                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v) => [fmt$.format(Number(v)), "Avg Deal Size"]} />
+                <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} />
+                <Tooltip {...CHART_TOOLTIP} formatter={v => [fmt$.format(Number(v)), "Avg Deal Size"]} />
                 <Line type="monotone" dataKey="avgDealSize" stroke="#fcd34d" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: "#fcd34d" }} />
               </LineChart>
             </ResponsiveContainer>
@@ -442,36 +467,38 @@ function DirectorView() {
   );
 }
 
-// ─── SETTERS VIEW ─────────────────────────────────────────────────────────────
+// ─── SETTERS ──────────────────────────────────────────────────────────────────
 
 function SettersView() {
   const setters = MOCK.setters;
+  const ranked = [...setters].sort((a, b) => b.cashCollected.value - a.cashCollected.value);
 
   const leaderboardCols = [
-    { key: "contactRate" as const,         label: "Contact Rate" },
-    { key: "appointmentsBooked" as const,  label: "Appts Booked" },
-    { key: "showRate" as const,            label: "Show Rate" },
-    { key: "conversionRate" as const,      label: "Conversion" },
+    { key: "cashCollected" as const,      label: "Cash Collected", gold: true },
+    { key: "dealsClosed" as const,        label: "Deals",          gold: false },
+    { key: "appointmentsBooked" as const, label: "Appts",          gold: false },
+    { key: "showRate" as const,           label: "Show Rate",      gold: false },
+    { key: "conversionRate" as const,     label: "Conversion",     gold: false },
   ];
-
-  // Rank setters by total appointments
-  const ranked = [...setters].sort((a, b) => b.appointmentsBooked.value - a.appointmentsBooked.value);
 
   return (
     <div className="space-y-8">
       <SampleBanner />
 
-      {/* Leaderboard table */}
+      {/* Revenue leaderboard */}
       <div className="space-y-3">
-        <SectionHeader title="Leaderboard" />
+        <SectionHeader title="Revenue leaderboard" />
         <div className="rounded-xl overflow-hidden" style={CARD}>
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(180,210,240,0.08)", background: "rgba(13,24,40,0.6)" }}>
+              <tr style={{ borderBottom: "1px solid rgba(180,210,240,0.08)", background: "rgba(8,15,28,0.8)" }}>
                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "#4a6a8a" }}>#</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "#4a6a8a" }}>Setter</th>
                 {leaderboardCols.map(c => (
-                  <th key={c.key} className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "#4a6a8a" }}>{c.label}</th>
+                  <th key={c.key} className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: c.gold ? "rgba(252,211,77,0.7)" : "#4a6a8a" }}>
+                    {c.label}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -485,10 +512,11 @@ function SettersView() {
                 >
                   <td className="px-4 py-3.5">
                     <span
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
                       style={{
                         background: i === 0 ? "rgba(245,158,11,0.2)" : i === 1 ? "rgba(148,163,184,0.15)" : "rgba(205,124,84,0.15)",
                         color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : "#cd7c54",
+                        boxShadow: i === 0 ? "0 0 8px rgba(245,158,11,0.3)" : undefined,
                       }}
                     >
                       {i + 1}
@@ -511,12 +539,11 @@ function SettersView() {
                     const isDown = kpi.delta !== null && kpi.delta < 0;
                     return (
                       <td key={c.key} className="px-4 py-3.5 text-right">
-                        <span className="font-bold" style={{ color: "#dce8f4" }}>{formatValue(kpi)}</span>
+                        <span className="font-bold" style={{ color: c.gold ? "#fcd34d" : "#dce8f4" }}>
+                          {formatValue(kpi)}
+                        </span>
                         {kpi.delta !== null && (
-                          <span
-                            className="ml-1.5 text-[10px] font-semibold"
-                            style={{ color: isUp ? "#4ade80" : isDown ? "#f87171" : "#7a9ab8" }}
-                          >
+                          <span className="ml-1.5 text-[10px] font-semibold" style={{ color: isUp ? "#4ade80" : isDown ? "#f87171" : "#7a9ab8" }}>
                             {isUp ? "▲" : isDown ? "▼" : "—"}
                           </span>
                         )}
@@ -530,32 +557,52 @@ function SettersView() {
         </div>
       </div>
 
-      {/* Comparison chart */}
+      {/* Comparison charts */}
       <div className="space-y-3">
         <SectionHeader title="Rate comparison" />
-        <ChartCard title="Contact · Show · Conversion by setter" subtitle="This period">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              data={setters.map(s => ({
-                name: s.name,
-                "Contact Rate": s.contactRate.value,
-                "Show Rate": s.showRate.value,
-                "Conversion": s.conversionRate.value,
-                color: s.color,
-              }))}
-              margin={{ top: 4, right: 4, bottom: 0, left: -10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: "#7a9ab8", fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
-              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v, name) => [`${v}%`, String(name)]} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "#7a9ab8", paddingTop: 8 }} />
-              <Bar dataKey="Contact Rate" fill="#4a7ab5" radius={[3,3,0,0]} />
-              <Bar dataKey="Show Rate"    fill="#34d399" radius={[3,3,0,0]} />
-              <Bar dataKey="Conversion"  fill="#f59e0b" radius={[3,3,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChartCard title="Contact · Show · Conversion" subtitle="Rates by setter this period">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={setters.map(s => ({
+                  name: s.name,
+                  "Contact Rate": s.contactRate.value,
+                  "Show Rate":    s.showRate.value,
+                  "Conversion":   s.conversionRate.value,
+                }))}
+                margin={{ top: 4, right: 4, bottom: 0, left: -10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: "#7a9ab8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip {...CHART_TOOLTIP} formatter={(v, n) => [`${v}%`, String(n)]} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "#7a9ab8", paddingTop: 8 }} />
+                <Bar dataKey="Contact Rate" fill="#4a7ab5" radius={[3,3,0,0]} />
+                <Bar dataKey="Show Rate"    fill="#34d399" radius={[3,3,0,0]} />
+                <Bar dataKey="Conversion"   fill="#f59e0b" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Cash Collected by Setter" subtitle="High-ticket revenue this period">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={setters.map(s => ({ name: s.name, Cash: s.cashCollected.value, color: s.color }))}
+                margin={{ top: 4, right: 4, bottom: 0, left: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: "#7a9ab8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                <Tooltip {...CHART_TOOLTIP} formatter={v => [fmt$.format(Number(v)), "Cash Collected"]} />
+                <Bar dataKey="Cash" radius={[4,4,0,0]}>
+                  {setters.map((s, i) => (
+                    <rect key={i} fill={s.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
       </div>
 
       {/* Individual breakdowns */}
@@ -564,10 +611,8 @@ function SettersView() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {setters.map(s => (
             <div key={s.name} className="rounded-xl overflow-hidden" style={CARD}>
-              <div
-                className="px-5 py-4 flex items-center gap-3"
-                style={{ borderBottom: "1px solid rgba(180,210,240,0.07)" }}
-              >
+              {/* Card header */}
+              <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(180,210,240,0.07)" }}>
                 <div
                   className="h-9 w-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0"
                   style={{ background: `${s.color}25`, border: `1px solid ${s.color}40` }}
@@ -576,14 +621,30 @@ function SettersView() {
                 </div>
                 <div>
                   <p className="font-bold text-white text-sm">{s.name}</p>
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
-                    style={{ background: `${s.color}20`, color: s.color }}
-                  >
+                  <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: `${s.color}20`, color: s.color }}>
                     Setter
                   </span>
                 </div>
               </div>
+
+              {/* Sales numbers first */}
+              <div className="px-4 pt-3 pb-1" style={{ borderBottom: "1px solid rgba(252,211,77,0.08)", background: "rgba(30,24,4,0.4)" }}>
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-2" style={{ color: "rgba(252,211,77,0.5)" }}>High-ticket</p>
+                {[
+                  { label: "Cash Collected", kpi: s.cashCollected },
+                  { label: "Deals Closed",   kpi: s.dealsClosed },
+                ].map(({ label, kpi }) => (
+                  <div key={label} className="flex items-center justify-between pb-2">
+                    <span className="text-[11px]" style={{ color: "#6a8aaa" }}>{label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold" style={{ color: "#fcd34d" }}>{formatValue(kpi)}</span>
+                      <Delta kpi={kpi} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Performance KPIs */}
               <div className="p-4 space-y-3">
                 {[
                   { label: "Contact Rate",        kpi: s.contactRate },
@@ -611,7 +672,7 @@ function SettersView() {
   );
 }
 
-// ─── VA & OPS VIEW ────────────────────────────────────────────────────────────
+// ─── VA & OPS ─────────────────────────────────────────────────────────────────
 
 function VAView() {
   const va = MOCK.va;
@@ -630,7 +691,6 @@ function VAView() {
       <SampleBanner />
       <PersonHeader name="Chona" role="VA & Ops" color={c} subtitle="Student success & operations" />
 
-      {/* KPI cards */}
       <div className="space-y-3">
         <SectionHeader title="KPI scorecard" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -640,7 +700,6 @@ function VAView() {
         </div>
       </div>
 
-      {/* Trend chart */}
       <div className="space-y-3">
         <SectionHeader title="Student Response Rate trend" />
         <ChartCard title="Student Response Rate" subtitle="Last 6 weeks">
@@ -648,8 +707,8 @@ function VAView() {
             <LineChart data={MOCK.trends} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
               <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[60, 90]} />
-              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v) => [`${v}%`, "Student Response"]} />
+              <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[60, 100]} />
+              <Tooltip {...CHART_TOOLTIP} formatter={v => [`${v}%`, "Student Response"]} />
               <Line type="monotone" dataKey="studentResponse" stroke={c} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: c }} />
             </LineChart>
           </ResponsiveContainer>
@@ -659,15 +718,15 @@ function VAView() {
   );
 }
 
-// ─── Sub-navigation ───────────────────────────────────────────────────────────
+// ─── Navigation ───────────────────────────────────────────────────────────────
 
 type ViewKey = "overview" | "director" | "setters" | "va";
 
 const VIEWS: { key: ViewKey; label: string }[] = [
-  { key: "overview",  label: "Overview" },
-  { key: "director",  label: "Sales Director" },
-  { key: "setters",   label: "Setters" },
-  { key: "va",        label: "VA & Ops" },
+  { key: "overview", label: "Overview" },
+  { key: "director", label: "Sales Director" },
+  { key: "setters",  label: "Setters" },
+  { key: "va",       label: "VA & Ops" },
 ];
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -691,7 +750,7 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const view = (searchParams.get("view") ?? initialView) as ViewKey;
+  const view   = (searchParams.get("view")   ?? initialView)   as ViewKey;
   const period = (searchParams.get("period") ?? initialPeriod) as Period;
 
   function navigate(newView: ViewKey, newPeriod?: Period) {
@@ -704,12 +763,11 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
   return (
     <div className="flex flex-col h-full">
 
-      {/* Sub-nav bar */}
+      {/* Sub-nav */}
       <div
         className="flex items-center justify-between px-6 py-3 shrink-0 gap-4 flex-wrap"
-        style={{ borderBottom: "1px solid rgba(180,210,240,0.08)", background: "rgba(8,15,28,0.5)" }}
+        style={{ borderBottom: "1px solid rgba(180,210,240,0.08)", background: "rgba(8,15,28,0.6)" }}
       >
-        {/* View tabs */}
         <div className="flex items-center gap-1">
           {VIEWS.map(({ key, label }) => {
             const active = view === key;
@@ -720,8 +778,9 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
                 className="relative px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-150"
                 style={{
                   background: active ? `${brandColor}20` : "transparent",
-                  color: active ? "#dce8f4" : "#3a5a7a",
-                  border: active ? `1px solid ${brandColor}35` : "1px solid transparent",
+                  color:      active ? "#dce8f4" : "#3a5a7a",
+                  border:     active ? `1px solid ${brandColor}35` : "1px solid transparent",
+                  boxShadow:  active ? `0 2px 12px ${brandColor}25` : undefined,
                 }}
               >
                 {label}
@@ -730,10 +789,9 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
           })}
         </div>
 
-        {/* Period toggle */}
         <div
           className="flex items-center gap-1 rounded-lg p-1"
-          style={{ background: "rgba(13,24,40,0.8)", border: "1px solid rgba(180,210,240,0.08)" }}
+          style={{ background: "rgba(8,15,28,0.9)", border: "1px solid rgba(180,210,240,0.08)" }}
         >
           {PERIODS.map(({ key, label }) => {
             const active = period === key;
@@ -759,14 +817,12 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
       </div>
 
       {/* Page content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-2 max-w-[1400px]">
-
-        {/* View title */}
+      <div className="flex-1 overflow-y-auto p-6 max-w-[1400px]">
         <div className="mb-6">
           <h1 className="text-xl font-bold text-white">
             {view === "overview" ? "Team Performance Overview" :
              view === "director" ? "Sales Director" :
-             view === "setters" ? "Setters" :
+             view === "setters"  ? "Setters" :
              "VA & Ops"}
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>
@@ -774,18 +830,16 @@ export function TrackersClient({ initialView, initialPeriod, tenantSlug, brandCo
           </p>
         </div>
 
-        {view === "overview"  && <OverviewView onNavigate={(v) => navigate(v as ViewKey)} />}
-        {view === "director"  && <DirectorView />}
-        {view === "setters"   && <SettersView />}
-        {view === "va"        && <VAView />}
+        {view === "overview" && <OverviewView onNavigate={v => navigate(v as ViewKey)} />}
+        {view === "director" && <DirectorView />}
+        {view === "setters"  && <SettersView />}
+        {view === "va"       && <VAView />}
 
-        {/* Footer */}
         <div className="pt-8 pb-2">
           <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
             A Stack N Scale managed client &nbsp;·&nbsp; Leadwell Advisors Analytics Platform
           </p>
         </div>
-
       </div>
     </div>
   );

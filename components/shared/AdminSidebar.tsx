@@ -5,20 +5,12 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
+  LayoutDashboard,
+  GitBranch,
   Trophy,
-  Calendar,
-  Users,
-  MessageSquare,
-  BookOpen,
-  TrendingUp,
   BarChart3,
-  Megaphone,
-  Receipt,
-  DollarSign,
-  RefreshCw,
-  ScrollText,
-  UsersRound,
   ChevronRight,
+  Users,
 } from "lucide-react";
 
 interface NavItem {
@@ -31,19 +23,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/admin",              label: "Leaderboard",  icon: Trophy,      exact: true },
-  { href: "/admin/calendar",     label: "Calendar",     icon: Calendar },
-  { href: "/admin/clients",      label: "Clients",      icon: Users },
-  { href: "/admin/messages",     label: "Messages",     icon: MessageSquare },
-  { href: "/admin/resources",    label: "Resources",    icon: BookOpen },
-  { href: "/admin/my-numbers",   label: "My Numbers",   icon: TrendingUp,   staffOnly: true },
-  { href: "/admin/insights",     label: "Insights",     icon: BarChart3 },
-  { href: "/admin/ads",          label: "Ad Scorecard", icon: Megaphone,    adminOnly: true },
-  { href: "/admin/expenses",     label: "Expenses",     icon: Receipt,      adminOnly: true },
-  { href: "/admin/payouts",      label: "Payouts",      icon: DollarSign,   adminOnly: true },
-  { href: "/admin/sync-status",  label: "Sync Status",  icon: RefreshCw,    adminOnly: true },
-  { href: "/admin/logs",         label: "Logs",         icon: ScrollText,   adminOnly: true },
-  { href: "/admin/users",        label: "Users",        icon: UsersRound,   adminOnly: true },
+  { href: "/admin",             label: "Dashboard",       icon: LayoutDashboard, exact: true },
+  { href: "/admin/pipeline",    label: "Pipeline",        icon: GitBranch },
+  { href: "/admin/leaderboard", label: "Rep Leaderboard", icon: Trophy },
+  { href: "/admin/staff",       label: "Staff",           icon: Users },
 ];
 
 export function AdminSidebar() {
