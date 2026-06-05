@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStaffMetrics } from "@/lib/analytics/sheet-metrics";
 import { StaffDashboardClient } from "@/app/staff/StaffDashboardClient";
+import { ImpersonateButton } from "./ImpersonateButton";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -30,32 +31,37 @@ export default async function StaffPreviewPage({ params }: { params: Promise<{ i
     member.sheet_tab ?? undefined
   );
 
-  const roleColor = member.role === "closer" ? "#f97316" : "#22c55e";
+  const roleColor = "rgba(74,122,181,0.15)";
+  const roleBorderColor = "rgba(74,122,181,0.3)";
 
   return (
-    <div style={{ background: "#0a0a0a", minHeight: "100vh" }}>
-      {/* Admin preview banner */}
-      <div className="flex items-center gap-3 px-6 py-3 text-sm"
-        style={{ background: "rgba(249,115,22,0.1)", borderBottom: "1px solid rgba(249,115,22,0.2)" }}>
+    <div style={{ background: "linear-gradient(180deg, #0a1525 0%, #080f1e 100%)", minHeight: "100vh" }}>
+      {/* Admin preview banner — navy/silver style */}
+      <div className="flex items-center gap-3 px-6 py-3 text-sm flex-wrap"
+        style={{
+          background: "rgba(180,210,240,0.05)",
+          borderBottom: "1px solid rgba(180,210,240,0.12)",
+        }}>
         <Link href="/admin/staff"
           className="flex items-center gap-1.5 font-medium transition-opacity hover:opacity-70"
-          style={{ color: "#f97316" }}>
+          style={{ color: "#7a9ab8" }}>
           <ArrowLeft className="h-4 w-4" />
           Back to Staff Roster
         </Link>
-        <span style={{ color: "rgba(249,115,22,0.4)" }}>·</span>
-        <span style={{ color: "#f97316" }}>Previewing as</span>
-        <span className="font-bold" style={{ color: "#fff" }}>{member.name}</span>
+        <span style={{ color: "rgba(180,210,240,0.2)" }}>·</span>
+        <span style={{ color: "#4a6a8a" }}>Previewing as</span>
+        <span className="font-bold" style={{ color: "#dce8f4" }}>{member.name}</span>
         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
-          style={{ background: `${roleColor}20`, border: `1px solid ${roleColor}40`, color: roleColor }}>
+          style={{ background: roleColor, border: `1px solid ${roleBorderColor}`, color: "#7ab5f5" }}>
           {member.role}
         </span>
-        <span className="ml-auto text-xs" style={{ color: "rgba(249,115,22,0.5)" }}>
+        <ImpersonateButton staffId={id} />
+        <span className="ml-auto text-xs hidden sm:block" style={{ color: "#3a5a7a" }}>
           Admin view only — rep cannot see this banner
         </span>
       </div>
 
-      {/* Rep dashboard */}
+      {/* Rep dashboard — exact rep view */}
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <StaffDashboardClient metrics={metrics as any} role={member.role as "setter" | "closer"} repName={member.name} />
     </div>

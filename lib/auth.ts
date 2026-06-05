@@ -1,6 +1,7 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import bcrypt from "bcryptjs";
+import { createHmac } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const authOptions: NextAuthOptions = {
@@ -23,6 +24,52 @@ export const authOptions: NextAuthOptions = {
         if (pw !== masterPw) return null;
 
         return { id: "admin", name: "Admin", email: adminEmail, role: "admin" };
+      },
+    }),
+
+    // Admin impersonate — creates a staff session without knowing rep's password
+    CredentialsProvider({
+      id: "impersonate",
+      name: "Impersonate",
+      credentials: {
+        token:   { label: "Token",   type: "text" },
+        staffId: { label: "StaffId", type: "text" },
+      },
+      async authorize(credentials) {
+        const { token, staffId } = credentials ?? {};
+        if (!token || !staffId) return null;
+
+        // Verify HMAC token — valid for current and previous 30-second window
+        const secret = process.env.NEXTAUTH_SECRET ?? process.env.SESSION_SECRET ?? process.env.MASTER_PASSWORD ?? "";
+        const now = Math.floor(Date.now() / 30_000);
+        const validTokens = [now, now - 1].map(w =>
+          createHmac("sha256", secret).update(`${staffId}:${w}`).digest("hex")
+        );
+        if (!validTokens.includes(token)) return null;
+
+        try {
+          const sb = createServiceClient();
+          const { data } = await sb
+            .from("staff_accounts")
+            .select("id, name, email, role, sheet_id, sheet_tab, active")
+            .eq("id", staffId)
+            .single();
+
+          if (!data || !data.active) return null;
+
+          return {
+            id:        data.id,
+            name:      data.name,
+            email:     data.email,
+            role:      data.role,
+            isStaff:   true,
+            staffRole: data.role as "setter" | "closer",
+            sheetId:   data.sheet_id ?? undefined,
+            sheetTab:  data.sheet_tab ?? "Sheet1",
+          };
+        } catch {
+          return null;
+        }
       },
     }),
 
