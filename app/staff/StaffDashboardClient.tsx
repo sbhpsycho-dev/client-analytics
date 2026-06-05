@@ -158,7 +158,6 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
         <div className="space-y-2">
           <SectionHeader title="Calls" />
           <div className="grid grid-cols-3 gap-3">
-            {[["Calls Made", callsMade, setCallsMade], ["DMs", dms, setDms], ["Call Connects", connects, setConnects]] as const}
             {([["Calls Made", callsMade, setCallsMade], ["DMs", dms, setDms], ["Call Connects", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
               <div key={label} className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
