@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { sheetsAppend } from "@/lib/google/sheets";
 import { getServiceAccountToken } from "@/lib/google/service-account";
 
+const MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE",
+                 "JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) {
@@ -22,28 +25,30 @@ export async function POST(req: Request) {
   const { date } = body;
   if (!date) return NextResponse.json({ error: "Date is required" }, { status: 400 });
 
-  // Production sheet format (Fadi/Conner/Kevin style):
-  // Col A: Day of Month, B: Calls Made, C: DMs, D: Call Connects,
-  // E: Appointment Sets, F: Demos Showed, G: Intro Units, H: Major Units,
-  // I: Sales, J: Collections, K: Terms/Status, L: Overall Total Commissions
-  const isProductionFormat = "callsMade" in body || "appointmentSets" in body;
+  // Build row matching sheet columns:
+  // Date | Rep | Closer | Made | Ans | NS | Can | Set | Show | Pitch | Close | Cash | Leads | Refunds
+  // Percentage columns (Ans%, Show%, Pitch%, Close%, D→C%) are sheet formulas — leave blank
+  const isNewFormat = "made" in body || "set" in body;
 
   let row: string[];
-  if (isProductionFormat) {
-    const day = new Date(date).getDate();
+  if (isNewFormat) {
     row = [
-      String(day),
-      String(body.callsMade       ?? 0),
-      String(body.dms             ?? 0),
-      String(body.callConnects    ?? 0),
-      String(body.appointmentSets ?? 0),
-      String(body.demosShowed     ?? 0),
-      String(body.introUnits      ?? 0),
-      String(body.majorUnits      ?? 0),
-      String(body.sales           ?? 0),
-      String(body.collections     ?? 0),
-      body.termsStatus ?? "",
-      String(body.commissions     ?? 0),
+      date,
+      name ?? "",
+      "",                              // Closer — blank for reps
+      String(body.made    ?? 0),
+      String(body.ans     ?? 0),
+      String(body.ns      ?? 0),
+      String(body.can     ?? 0),
+      String(body.set     ?? 0),
+      String(body.show    ?? 0),
+      String(body.pitch   ?? 0),
+      String(body.close   ?? 0),
+      String(body.cash    ?? 0),
+      String(body.leads   ?? 0),
+      String(body.refunds ?? 0),
+      // Leave Ans%, Show%, Pitch%, Close%, D→C% blank — sheet calculates them
+      "", "", "", "", "",
     ];
   } else if (staffRole === "setter") {
     const { callsBooked = 0, demosScheduled = 0 } = body;
@@ -53,6 +58,11 @@ export async function POST(req: Request) {
     row = [date, name ?? "", "closer", String(callsMade), String(dealsClosed), String(cashCollected)];
   }
 
+  // Use current month tab for production sheets; otherwise use configured tab
+  const tab = isNewFormat
+    ? MONTHS[new Date().getMonth()]
+    : (sheetTab ?? "Sheet1");
+
   const accessToken = await getServiceAccountToken();
   if (!accessToken) {
     return NextResponse.json(
@@ -61,14 +71,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE",
-                   "JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
-  const tab = isProductionFormat
-    ? MONTHS[new Date().getMonth()]
-    : (sheetTab ?? "Sheet1");
-
   try {
-    await sheetsAppend(accessToken, sheetId, `${tab}!A:L`, [row]);
+    await sheetsAppend(accessToken, sheetId, `${tab}!A:S`, [row]);
     return NextResponse.json({ success: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

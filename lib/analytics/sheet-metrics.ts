@@ -73,17 +73,28 @@ export interface RepSheetConfig {
 export interface RepProductionStats {
   name: string;
   sheetId: string;
-  callsMade: number;
-  dms: number;
-  callConnects: number;
-  appointmentSets: number;
-  demosShowed: number;
-  noShows: number;
-  showRate: number;
-  sales: number;
-  collections: number;
-  commissions: number;
-  callsTrend: number[];   // daily calls for current month so far
+  // Calls
+  made: number;        // Calls Made
+  ans: number;         // Calls Answered
+  ns: number;          // No Shows
+  can: number;         // Cancelled
+  // Pipeline
+  set: number;         // Demos Set
+  show: number;        // Demos Showed
+  pitch: number;       // Pitched
+  close: number;       // Deals Closed
+  // Revenue
+  cash: number;        // Cash Collected
+  leads: number;       // Leads
+  refunds: number;     // Refunds
+  // Calculated rates
+  ansRate: number;     // ans / made * 100
+  showRate: number;    // show / set * 100
+  pitchRate: number;   // pitch / show * 100
+  closeRate: number;   // close / pitch * 100
+  demoToClose: number; // close / set * 100
+  // Trend
+  callsTrend: number[];
 }
 
 export interface SheetMetrics {
@@ -142,45 +153,58 @@ function isProductionSheet(tabs: string[]): boolean {
   return MONTH_NAMES.some(m => upper.includes(m));
 }
 
+// Sales tracking row: Date | Rep | Closer | Made | Ans | NS | Can | Set | Show | Pitch | Close | Cash | Leads | Refunds | Ans% | Show% | Pitch% | Close% | D→C%
 interface ProductionRow {
-  day: number;
-  callsMade: number;
-  dms: number;
-  callConnects: number;
-  appointmentSets: number;
-  demosShowed: number;
-  introUnits: number;
-  majorUnits: number;
-  sales: number;
-  collections: number;
-  commissions: number;
+  date: string;
+  rep: string;
+  made: number;
+  ans: number;
+  ns: number;
+  can: number;
+  set: number;
+  show: number;
+  pitch: number;
+  close: number;
+  cash: number;
+  leads: number;
+  refunds: number;
 }
 
 function parseNum(v: string | undefined): number {
   if (!v) return 0;
-  const n = parseFloat(v.toString().replace(/[$,\s]/g, ""));
+  const n = parseFloat(v.toString().replace(/[$,%,\s]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
 function parseProductionSheetRows(raw: string[][]): ProductionRow[] {
-  // Row 0 = company name, Row 1 = headers, Rows 2+ = daily data
+  // Find the header row (contains "Made" or "Date")
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(raw.length, 5); i++) {
+    const row = raw[i].map(c => (c ?? "").toString().toLowerCase().trim());
+    if (row.some(c => c === "made" || c === "date")) { headerIdx = i; break; }
+  }
+
+  const dataStart = headerIdx >= 0 ? headerIdx + 1 : 1;
   const rows: ProductionRow[] = [];
-  for (let i = 2; i < raw.length; i++) {
+
+  for (let i = dataStart; i < raw.length; i++) {
     const r = raw[i];
-    const day = parseNum(r[0]);
-    if (day < 1 || day > 31) continue; // skip subtotal/total rows
+    const dateVal = (r[0] ?? "").toString().trim();
+    if (!dateVal) continue;  // skip empty rows
     rows.push({
-      day,
-      callsMade:      parseNum(r[1]),
-      dms:            parseNum(r[2]),
-      callConnects:   parseNum(r[3]),
-      appointmentSets:parseNum(r[4]),
-      demosShowed:    parseNum(r[5]),
-      introUnits:     parseNum(r[6]),
-      majorUnits:     parseNum(r[7]),
-      sales:          parseNum(r[8]),
-      collections:    parseNum(r[9]),
-      commissions:    parseNum(r[11]),
+      date:    dateVal,
+      rep:     (r[1] ?? "").toString().trim(),
+      made:    parseNum(r[3]),
+      ans:     parseNum(r[4]),
+      ns:      parseNum(r[5]),
+      can:     parseNum(r[6]),
+      set:     parseNum(r[7]),
+      show:    parseNum(r[8]),
+      pitch:   parseNum(r[9]),
+      close:   parseNum(r[10]),
+      cash:    parseNum(r[11]),
+      leads:   parseNum(r[12]),
+      refunds: parseNum(r[13]),
     });
   }
   return rows;
@@ -192,27 +216,39 @@ function computeRepProductionStats(
   sheetId: string
 ): RepProductionStats {
   const sum = (field: keyof ProductionRow) =>
-    rows.reduce((s, r) => s + (r[field] as number), 0);
+    rows.reduce((s, r) => {
+      const v = r[field];
+      return s + (typeof v === "number" ? v : 0);
+    }, 0);
 
-  const callsMade       = sum("callsMade");
-  const appointmentSets = sum("appointmentSets");
-  const demosShowed     = sum("demosShowed");
-  const sales           = sum("sales");
-  const callsTrend      = rows.slice(0, 31).map(r => r.callsMade);
+  const made  = sum("made");
+  const ans   = sum("ans");
+  const set   = sum("set");
+  const show  = sum("show");
+  const pitch = sum("pitch");
+  const close = sum("close");
+
+  const callsTrend = rows.slice(0, 31).map(r => r.made);
 
   return {
     name,
     sheetId,
-    callsMade,
-    dms:            sum("dms"),
-    callConnects:   sum("callConnects"),
-    appointmentSets,
-    demosShowed,
-    noShows:        Math.max(0, appointmentSets - demosShowed),
-    showRate:       appointmentSets > 0 ? Math.round((demosShowed / appointmentSets) * 100) : 0,
-    sales,
-    collections:    sum("collections"),
-    commissions:    sum("commissions"),
+    made,
+    ans,
+    ns:      sum("ns"),
+    can:     sum("can"),
+    set,
+    show,
+    pitch,
+    close,
+    cash:    sum("cash"),
+    leads:   sum("leads"),
+    refunds: sum("refunds"),
+    ansRate:     made  > 0 ? Math.round((ans   / made)  * 100) : 0,
+    showRate:    set   > 0 ? Math.round((show  / set)   * 100) : 0,
+    pitchRate:   show  > 0 ? Math.round((pitch / show)  * 100) : 0,
+    closeRate:   pitch > 0 ? Math.round((close / pitch) * 100) : 0,
+    demoToClose: set   > 0 ? Math.round((close / set)   * 100) : 0,
     callsTrend,
   };
 }
@@ -561,23 +597,23 @@ async function getProductionMetrics(sheets: RepSheetConfig[]): Promise<SheetMetr
   const total = (field: keyof RepProductionStats) =>
     perRep.reduce((s, r) => s + (typeof r[field] === "number" ? (r[field] as number) : 0), 0);
 
-  const totalCollections  = total("collections");
-  const totalSales        = total("sales");
-  const totalCalls        = total("callsMade");
-  const totalApptSets     = total("appointmentSets");
+  const totalCash   = total("cash");
+  const totalClose  = total("close");
+  const totalMade   = total("made");
+  const totalSet    = total("set");
 
   const dashboard: DashboardMetrics = {
-    cashCollectedMTD:    totalCollections,
-    netRevenueMTD:       totalCollections,
-    leadsThisMonth:      totalApptSets,
-    totalDealsClosed:    totalSales,
+    cashCollectedMTD:    totalCash,
+    netRevenueMTD:       totalCash - total("refunds"),
+    leadsThisMonth:      total("leads"),
+    totalDealsClosed:    totalClose,
     costPerClose:        0,
-    mrr:                 totalCollections,
-    cashCollectedYTD:    totalCollections,
-    totalRefundMTD:      0,
+    mrr:                 totalCash,
+    cashCollectedYTD:    totalCash,
+    totalRefundMTD:      total("refunds"),
     avgLeadResponseTime: "—",
-    cashTrend:           [0, 0, 0, 0, 0, totalCollections],
-    mrrTrend:            [0, 0, 0, 0, 0, totalCollections],
+    cashTrend:           [0, 0, 0, 0, 0, totalCash],
+    mrrTrend:            [0, 0, 0, 0, 0, totalCash],
     deltas: {
       cashCollectedMTD: 0, netRevenueMTD: 0, leadsThisMonth: 0,
       totalDealsClosed: 0, costPerClose: 0, mrr: 0,
@@ -588,24 +624,24 @@ async function getProductionMetrics(sheets: RepSheetConfig[]): Promise<SheetMetr
   const pipeline: PipelineRep[] = perRep.map((r, i) => ({
     name:          r.name,
     color:         REP_COLORS[i % REP_COLORS.length],
-    callsMade:     r.callsMade,
-    callsAnswered: r.callConnects,
-    demosSet:      r.appointmentSets,
-    demosShowed:   r.demosShowed,
-    pitched:       r.demosShowed,
-    closed:        r.sales,
+    callsMade:     r.made,
+    callsAnswered: r.ans,
+    demosSet:      r.set,
+    demosShowed:   r.show,
+    pitched:       r.pitch,
+    closed:        r.close,
   }));
 
   const leaderboard: LeaderboardRep[] = perRep
-    .sort((a, b) => b.collections - a.collections)
+    .sort((a, b) => b.cash - a.cash)
     .map((r, i) => ({
       name:         r.name,
       color:        REP_COLORS[i % REP_COLORS.length],
-      cashCollected:r.collections,
-      dealsClosed:  r.sales,
-      callsMade:    r.callsMade,
-      closeRate:    r.callsMade > 0 ? Math.round((r.sales / r.callsMade) * 100) : 0,
-      avgDealSize:  r.sales > 0 ? Math.round(r.collections / r.sales) : 0,
+      cashCollected:r.cash,
+      dealsClosed:  r.close,
+      callsMade:    r.made,
+      closeRate:    r.made > 0 ? Math.round((r.close / r.made) * 100) : 0,
+      avgDealSize:  r.close > 0 ? Math.round(r.cash / r.close) : 0,
     }));
 
   return {
@@ -682,6 +718,17 @@ export async function getSheetMetrics(repSheets?: RepSheetConfig[]): Promise<She
   }
 }
 
+function emptyRepStats(name: string, sheetId: string): RepProductionStats {
+  return {
+    name, sheetId,
+    made: 0, ans: 0, ns: 0, can: 0,
+    set: 0, show: 0, pitch: 0, close: 0,
+    cash: 0, leads: 0, refunds: 0,
+    ansRate: 0, showRate: 0, pitchRate: 0, closeRate: 0, demoToClose: 0,
+    callsTrend: [],
+  };
+}
+
 // ── Per-staff metrics (for individual rep dashboards) ─────────────────────────
 
 export async function getStaffMetrics(
@@ -696,9 +743,17 @@ export async function getStaffMetrics(
       const tabs = await sheetMeta(sheetId);
       if (isProductionSheet(tabs)) {
         const monthTab = getCurrentMonthTab();
-        const raw = await sheetGet(sheetId, `${monthTab}!A:L`);
+        const raw = await sheetGet(sheetId, `${monthTab}!A:R`);
         const rows = parseProductionSheetRows(raw);
         return computeRepProductionStats(rows, staffName, sheetId);
+      }
+      // Also try as a non-monthly sales tracking sheet
+      const raw = await sheetGet(sheetId, "A:R");
+      if (raw.length > 0) {
+        const rows = parseProductionSheetRows(raw);
+        if (rows.length > 0) {
+          return computeRepProductionStats(rows, staffName, sheetId);
+        }
       }
     }
 
@@ -714,17 +769,8 @@ export async function getStaffMetrics(
     }
 
     if (rows.length === 0) {
-      // Return mock data for this rep
-      if (role === "setter") {
-        return MOCK_SETTER_STATS.find(s => s.name === staffName) ?? {
-          name: staffName, callsBooked: 0, demosShowed: 0, noShows: 0,
-          showRate: 0, rankAmongSetters: 1, totalSetters: 1, bookingTrend: [0,0,0,0,0,0],
-        };
-      }
-      return MOCK_CLOSER_STATS.find(s => s.name === staffName) ?? {
-        name: staffName, cashCollected: 0, dealsClosed: 0, closeRate: 0,
-        avgDealSize: 0, rankAmongClosers: 1, totalClosers: 1, cashTrend: [0,0,0,0,0,0],
-      };
+      // Return empty production stats
+      return emptyRepStats(staffName, sheetId ?? "");
     }
 
     if (role === "setter") {
@@ -743,15 +789,6 @@ export async function getStaffMetrics(
       cashTrend: [0,0,0,0,0,0],
     };
   } catch {
-    if (role === "setter") {
-      return {
-        name: staffName, callsBooked: 0, demosShowed: 0, noShows: 0,
-        showRate: 0, rankAmongSetters: 1, totalSetters: 1, bookingTrend: [0,0,0,0,0,0],
-      };
-    }
-    return {
-      name: staffName, cashCollected: 0, dealsClosed: 0, closeRate: 0,
-      avgDealSize: 0, rankAmongClosers: 1, totalClosers: 1, cashTrend: [0,0,0,0,0,0],
-    };
+    return emptyRepStats(staffName, sheetId ?? "");
   }
 }
