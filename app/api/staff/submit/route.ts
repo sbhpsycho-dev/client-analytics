@@ -61,8 +61,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // For production sheets, use current month tab; otherwise use configured tab
-  const tab = sheetTab ?? "Sheet1";
+  const MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE",
+                   "JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+  const tab = isProductionFormat
+    ? MONTHS[new Date().getMonth()]
+    : (sheetTab ?? "Sheet1");
 
   try {
     await sheetsAppend(accessToken, sheetId, `${tab}!A:L`, [row]);

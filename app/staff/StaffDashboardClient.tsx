@@ -211,6 +211,109 @@ function LogNumbersForm({ role }: { role: "setter" | "closer" }) {
   );
 }
 
+// ── Production log form ───────────────────────────────────────────────────────
+
+function ProductionLogForm() {
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [callsMade, setCallsMade] = useState("");
+  const [dms, setDms] = useState("");
+  const [callConnects, setCallConnects] = useState("");
+  const [appointmentSets, setAppointmentSets] = useState("");
+  const [demosShowed, setDemosShowed] = useState("");
+  const [sales, setSales] = useState("");
+  const [collections, setCollections] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  function reset() {
+    setCallsMade(""); setDms(""); setCallConnects("");
+    setAppointmentSets(""); setDemosShowed(""); setSales(""); setCollections("");
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await fetch("/api/staff/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          callsMade:       Number(callsMade)       || 0,
+          dms:             Number(dms)             || 0,
+          callConnects:    Number(callConnects)    || 0,
+          appointmentSets: Number(appointmentSets) || 0,
+          demosShowed:     Number(demosShowed)     || 0,
+          sales:           Number(sales)           || 0,
+          collections:     Number(collections.replace(/[$,]/g, "")) || 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Failed to submit"); return; }
+      toast.success("Numbers logged to your sheet");
+      reset();
+      setOpen(false);
+    });
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(180,210,240,0.12)",
+    color: "#dce8f4",
+  };
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={CARD}>
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 w-full px-5 py-4 text-sm font-semibold"
+        style={{ color: "#a8bdd4" }}>
+        <Send className="h-4 w-4" style={{ color: "#4a7ab5" }} />
+        Log Today's Numbers
+        {open ? <ChevronUp className="h-4 w-4 ml-auto opacity-40" /> : <ChevronDown className="h-4 w-4 ml-auto opacity-40" />}
+      </button>
+
+      {open && (
+        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t" style={{ borderColor: "rgba(180,210,240,0.08)" }}>
+          <div className="pt-4 space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
+            <Input type="date" value={date} onChange={e => setDate(e.target.value)} required className="h-10 rounded-lg text-sm" style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Calls Made",    value: callsMade,       set: setCallsMade },
+              { label: "DMs",           value: dms,             set: setDms },
+              { label: "Call Connects", value: callConnects,    set: setCallConnects },
+              { label: "Appt Sets",     value: appointmentSets, set: setAppointmentSets },
+              { label: "Demos Showed",  value: demosShowed,     set: setDemosShowed },
+              { label: "Sales",         value: sales,           set: setSales },
+            ].map(({ label, value, set }) => (
+              <div key={label} className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+                <Input type="number" min="0" value={value} onChange={e => set(e.target.value)}
+                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
+              </div>
+            ))}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
+              <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
+                placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button type="submit" disabled={isPending} className="h-9 px-5 text-sm font-semibold rounded-lg"
+              style={{ background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)", border: "1px solid rgba(180,210,240,0.18)", color: "#dce8f4" }}>
+              {isPending ? "Submitting..." : "Submit to Sheet"}
+            </Button>
+            <Button type="button" onClick={() => { reset(); setOpen(false); }} className="h-9 px-4 text-sm rounded-lg"
+              style={{ background: "transparent", border: "1px solid rgba(180,210,240,0.1)", color: "#4a6a8a" }}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ── Production sheet view ─────────────────────────────────────────────────────
 
 function ProductionView({ p, repName, countdown }: { p: RepProductionStats; repName: string; countdown: number }) {
@@ -260,6 +363,17 @@ function ProductionView({ p, repName, countdown }: { p: RepProductionStats; repN
         <SectionHeader title="Daily calls · this month" />
         <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 30)} color="#1D9E75"
           formatter={v => String(v)} />
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeader title="Submit numbers" />
+        <ProductionLogForm />
+      </div>
+
+      <div className="pb-2">
+        <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
+          Leadwell Advisors Analytics Platform &nbsp;·&nbsp; A Stack N Scale managed client
+        </p>
       </div>
     </div>
   );
