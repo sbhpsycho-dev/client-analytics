@@ -73,28 +73,16 @@ export interface RepSheetConfig {
 export interface RepProductionStats {
   name: string;
   sheetId: string;
-  // Calls
-  made: number;        // Calls Made
-  ans: number;         // Calls Answered
-  ns: number;          // No Shows
-  can: number;         // Cancelled
-  // Pipeline
-  set: number;         // Demos Set
-  show: number;        // Demos Showed
-  pitch: number;       // Pitched
-  close: number;       // Deals Closed
-  // Revenue
-  cash: number;        // Cash Collected
-  leads: number;       // Leads
-  refunds: number;     // Refunds
-  // Calculated rates
-  ansRate: number;     // ans / made * 100
-  showRate: number;    // show / set * 100
-  pitchRate: number;   // pitch / show * 100
-  closeRate: number;   // close / pitch * 100
-  demoToClose: number; // close / set * 100
-  // Trend
-  callsTrend: number[];
+  callsMade: number;    // col B — Calls Made
+  dms: number;          // col C — DMs
+  connects: number;     // col D — Call Connects
+  set: number;          // col E — Appointment Sets
+  show: number;         // col F — Demos Showed
+  sales: number;        // col I — Sales (deals closed)
+  collections: number;  // col J — Collections (cash)
+  showRate: number;     // show / set * 100
+  closeRate: number;    // sales / show * 100
+  callsTrend: number[]; // daily callsMade for current month
 }
 
 export interface SheetMetrics {
@@ -153,21 +141,16 @@ function isProductionSheet(tabs: string[]): boolean {
   return MONTH_NAMES.some(m => upper.includes(m));
 }
 
-// Sales tracking row: Date | Rep | Closer | Made | Ans | NS | Can | Set | Show | Pitch | Close | Cash | Leads | Refunds | Ans% | Show% | Pitch% | Close% | D→C%
+// Production sheet row: Day of Month | Calls Made | DMs | Call Connects | Appointment Sets | Demos Showed | Intro Units | Major Units | Sales | Collections | Terms/Status | Commissions
 interface ProductionRow {
-  date: string;
-  rep: string;
-  made: number;
-  ans: number;
-  ns: number;
-  can: number;
+  day: number;
+  callsMade: number;
+  dms: number;
+  connects: number;
   set: number;
   show: number;
-  pitch: number;
-  close: number;
-  cash: number;
-  leads: number;
-  refunds: number;
+  sales: number;
+  collections: number;
 }
 
 function parseNum(v: string | undefined): number {
@@ -177,34 +160,22 @@ function parseNum(v: string | undefined): number {
 }
 
 function parseProductionSheetRows(raw: string[][]): ProductionRow[] {
-  // Find the header row (contains "Made" or "Date")
-  let headerIdx = -1;
-  for (let i = 0; i < Math.min(raw.length, 5); i++) {
-    const row = raw[i].map(c => (c ?? "").toString().toLowerCase().trim());
-    if (row.some(c => c === "made" || c === "date")) { headerIdx = i; break; }
-  }
-
-  const dataStart = headerIdx >= 0 ? headerIdx + 1 : 1;
+  // Row 0: company name, Row 1: headers, Rows 2+: daily data
   const rows: ProductionRow[] = [];
-
-  for (let i = dataStart; i < raw.length; i++) {
+  for (let i = 2; i < raw.length; i++) {
     const r = raw[i];
-    const dateVal = (r[0] ?? "").toString().trim();
-    if (!dateVal) continue;  // skip empty rows
+    const dayVal = (r[0] ?? "").toString().trim();
+    const day = parseFloat(dayVal);
+    if (isNaN(day) || day < 1 || day > 31) continue; // skip totals/empty rows
     rows.push({
-      date:    dateVal,
-      rep:     (r[1] ?? "").toString().trim(),
-      made:    parseNum(r[3]),
-      ans:     parseNum(r[4]),
-      ns:      parseNum(r[5]),
-      can:     parseNum(r[6]),
-      set:     parseNum(r[7]),
-      show:    parseNum(r[8]),
-      pitch:   parseNum(r[9]),
-      close:   parseNum(r[10]),
-      cash:    parseNum(r[11]),
-      leads:   parseNum(r[12]),
-      refunds: parseNum(r[13]),
+      day,
+      callsMade:   parseNum(r[1]),
+      dms:         parseNum(r[2]),
+      connects:    parseNum(r[3]),
+      set:         parseNum(r[4]),
+      show:        parseNum(r[5]),
+      sales:       parseNum(r[8]),
+      collections: parseNum(r[9]),
     });
   }
   return rows;
@@ -216,39 +187,25 @@ function computeRepProductionStats(
   sheetId: string
 ): RepProductionStats {
   const sum = (field: keyof ProductionRow) =>
-    rows.reduce((s, r) => {
-      const v = r[field];
-      return s + (typeof v === "number" ? v : 0);
-    }, 0);
+    rows.reduce((s, r) => s + (r[field] as number), 0);
 
-  const made  = sum("made");
-  const ans   = sum("ans");
   const set   = sum("set");
   const show  = sum("show");
-  const pitch = sum("pitch");
-  const close = sum("close");
-
-  const callsTrend = rows.slice(0, 31).map(r => r.made);
+  const sales = sum("sales");
+  const callsTrend = rows.slice(0, 31).map(r => r.callsMade);
 
   return {
     name,
     sheetId,
-    made,
-    ans,
-    ns:      sum("ns"),
-    can:     sum("can"),
+    callsMade:   sum("callsMade"),
+    dms:         sum("dms"),
+    connects:    sum("connects"),
     set,
     show,
-    pitch,
-    close,
-    cash:    sum("cash"),
-    leads:   sum("leads"),
-    refunds: sum("refunds"),
-    ansRate:     made  > 0 ? Math.round((ans   / made)  * 100) : 0,
+    sales,
+    collections: sum("collections"),
     showRate:    set   > 0 ? Math.round((show  / set)   * 100) : 0,
-    pitchRate:   show  > 0 ? Math.round((pitch / show)  * 100) : 0,
-    closeRate:   pitch > 0 ? Math.round((close / pitch) * 100) : 0,
-    demoToClose: set   > 0 ? Math.round((close / set)   * 100) : 0,
+    closeRate:   show  > 0 ? Math.round((sales / show)  * 100) : 0,
     callsTrend,
   };
 }
@@ -597,23 +554,21 @@ async function getProductionMetrics(sheets: RepSheetConfig[]): Promise<SheetMetr
   const total = (field: keyof RepProductionStats) =>
     perRep.reduce((s, r) => s + (typeof r[field] === "number" ? (r[field] as number) : 0), 0);
 
-  const totalCash   = total("cash");
-  const totalClose  = total("close");
-  const totalMade   = total("made");
-  const totalSet    = total("set");
+  const totalCollections = total("collections");
+  const totalSales       = total("sales");
 
   const dashboard: DashboardMetrics = {
-    cashCollectedMTD:    totalCash,
-    netRevenueMTD:       totalCash - total("refunds"),
-    leadsThisMonth:      total("leads"),
-    totalDealsClosed:    totalClose,
+    cashCollectedMTD:    totalCollections,
+    netRevenueMTD:       totalCollections,
+    leadsThisMonth:      total("set"),
+    totalDealsClosed:    totalSales,
     costPerClose:        0,
-    mrr:                 totalCash,
-    cashCollectedYTD:    totalCash,
-    totalRefundMTD:      total("refunds"),
+    mrr:                 totalCollections,
+    cashCollectedYTD:    totalCollections,
+    totalRefundMTD:      0,
     avgLeadResponseTime: "—",
-    cashTrend:           [0, 0, 0, 0, 0, totalCash],
-    mrrTrend:            [0, 0, 0, 0, 0, totalCash],
+    cashTrend:           [0, 0, 0, 0, 0, totalCollections],
+    mrrTrend:            [0, 0, 0, 0, 0, totalCollections],
     deltas: {
       cashCollectedMTD: 0, netRevenueMTD: 0, leadsThisMonth: 0,
       totalDealsClosed: 0, costPerClose: 0, mrr: 0,
@@ -624,24 +579,24 @@ async function getProductionMetrics(sheets: RepSheetConfig[]): Promise<SheetMetr
   const pipeline: PipelineRep[] = perRep.map((r, i) => ({
     name:          r.name,
     color:         REP_COLORS[i % REP_COLORS.length],
-    callsMade:     r.made,
-    callsAnswered: r.ans,
+    callsMade:     r.callsMade,
+    callsAnswered: r.connects,
     demosSet:      r.set,
     demosShowed:   r.show,
-    pitched:       r.pitch,
-    closed:        r.close,
+    pitched:       r.show,
+    closed:        r.sales,
   }));
 
   const leaderboard: LeaderboardRep[] = perRep
-    .sort((a, b) => b.cash - a.cash)
+    .sort((a, b) => b.collections - a.collections)
     .map((r, i) => ({
       name:         r.name,
       color:        REP_COLORS[i % REP_COLORS.length],
-      cashCollected:r.cash,
-      dealsClosed:  r.close,
-      callsMade:    r.made,
-      closeRate:    r.made > 0 ? Math.round((r.close / r.made) * 100) : 0,
-      avgDealSize:  r.close > 0 ? Math.round(r.cash / r.close) : 0,
+      cashCollected:r.collections,
+      dealsClosed:  r.sales,
+      callsMade:    r.callsMade,
+      closeRate:    r.callsMade > 0 ? Math.round((r.sales / r.callsMade) * 100) : 0,
+      avgDealSize:  r.sales > 0 ? Math.round(r.collections / r.sales) : 0,
     }));
 
   return {
@@ -721,10 +676,9 @@ export async function getSheetMetrics(repSheets?: RepSheetConfig[]): Promise<She
 function emptyRepStats(name: string, sheetId: string): RepProductionStats {
   return {
     name, sheetId,
-    made: 0, ans: 0, ns: 0, can: 0,
-    set: 0, show: 0, pitch: 0, close: 0,
-    cash: 0, leads: 0, refunds: 0,
-    ansRate: 0, showRate: 0, pitchRate: 0, closeRate: 0, demoToClose: 0,
+    callsMade: 0, dms: 0, connects: 0,
+    set: 0, show: 0, sales: 0, collections: 0,
+    showRate: 0, closeRate: 0,
     callsTrend: [],
   };
 }
@@ -743,18 +697,12 @@ export async function getStaffMetrics(
       const tabs = await sheetMeta(sheetId);
       if (isProductionSheet(tabs)) {
         const monthTab = getCurrentMonthTab();
-        const raw = await sheetGet(sheetId, `${monthTab}!A:R`);
+        const raw = await sheetGet(sheetId, `${monthTab}!A:L`);
         const rows = parseProductionSheetRows(raw);
         return computeRepProductionStats(rows, staffName, sheetId);
       }
-      // Also try as a non-monthly sales tracking sheet
-      const raw = await sheetGet(sheetId, "A:R");
-      if (raw.length > 0) {
-        const rows = parseProductionSheetRows(raw);
-        if (rows.length > 0) {
-          return computeRepProductionStats(rows, staffName, sheetId);
-        }
-      }
+      // Also try as a non-monthly sheet (fall through to legacy below)
+
     }
 
     let rows: ParsedRow[] = [];

@@ -9,7 +9,7 @@ import {
 import {
   BarChart2, ClipboardList,
   DollarSign, Target, TrendingUp, Users, AlertTriangle,
-  Phone, MessageSquare, Calendar, Eye,
+  Phone, MessageSquare, Calendar, Eye, BarChart3,
 } from "lucide-react";
 import type { SetterStats, CloserStats, RepProductionStats } from "@/lib/analytics/sheet-metrics";
 import { Button } from "@/components/ui/button";
@@ -95,20 +95,18 @@ function TrendChart({ title, data, color }: { title: string; data: number[]; col
 
 function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [vals, setVals] = useState({
-    made: "", ans: "", ns: "", can: "",
-    set: "", show: "", pitch: "", close: "",
-    cash: "", leads: "", refunds: "",
-  });
+  const [callsMade, setCallsMade]   = useState("");
+  const [dms, setDms]               = useState("");
+  const [connects, setConnects]     = useState("");
+  const [set, setSet]               = useState("");
+  const [show, setShow]             = useState("");
+  const [sales, setSales]           = useState("");
+  const [collections, setCollections] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  function set(field: keyof typeof vals) {
-    return (e: React.ChangeEvent<HTMLInputElement>) =>
-      setVals(v => ({ ...v, [field]: e.target.value }));
-  }
-
   function reset() {
-    setVals({ made: "", ans: "", ns: "", can: "", set: "", show: "", pitch: "", close: "", cash: "", leads: "", refunds: "" });
+    setCallsMade(""); setDms(""); setConnects("");
+    setSet(""); setShow(""); setSales(""); setCollections("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -119,17 +117,13 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date,
-          made:    Number(vals.made)                        || 0,
-          ans:     Number(vals.ans)                         || 0,
-          ns:      Number(vals.ns)                          || 0,
-          can:     Number(vals.can)                         || 0,
-          set:     Number(vals.set)                         || 0,
-          show:    Number(vals.show)                        || 0,
-          pitch:   Number(vals.pitch)                       || 0,
-          close:   Number(vals.close)                       || 0,
-          cash:    Number(vals.cash.replace(/[$,]/g, ""))   || 0,
-          leads:   Number(vals.leads)                       || 0,
-          refunds: Number(vals.refunds.replace(/[$,]/g, "")) || 0,
+          callsMade:   Number(callsMade)                   || 0,
+          dms:         Number(dms)                         || 0,
+          connects:    Number(connects)                    || 0,
+          set:         Number(set)                         || 0,
+          show:        Number(show)                        || 0,
+          sales:       Number(sales)                       || 0,
+          collections: Number(collections.replace(/[$,]/g, "")) || 0,
         }),
       });
       const data = await res.json();
@@ -147,10 +141,6 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
     color: "#dce8f4",
   };
 
-  const callFields:     [string, keyof typeof vals][] = [["Made", "made"], ["Ans", "ans"], ["NS", "ns"], ["Can", "can"]];
-  const pipelineFields: [string, keyof typeof vals][] = [["Set", "set"], ["Show", "show"], ["Pitch", "pitch"], ["Close", "close"]];
-  const revenueFields:  [string, keyof typeof vals][] = [["Cash ($)", "cash"], ["Leads", "leads"], ["Refunds ($)", "refunds"]];
-
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto w-full">
       <div>
@@ -165,32 +155,37 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
             required className="h-10 rounded-lg text-sm max-w-xs" style={inputStyle} />
         </div>
 
-        {[
-          { title: "Calls", fields: callFields },
-          { title: "Pipeline", fields: pipelineFields },
-          { title: "Revenue", fields: revenueFields },
-        ].map(({ title, fields }) => (
-          <div key={title} className="space-y-2">
-            <SectionHeader title={title} />
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {fields.map(([label, key]) => (
-                <div key={key} className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
-                  <Input
-                    type={label.includes("$") ? "text" : "number"}
-                    min={label.includes("$") ? undefined : "0"}
-                    value={vals[key]}
-                    onChange={set(key)}
-                    placeholder="0"
-                    required
-                    className="h-10 rounded-lg text-sm"
-                    style={inputStyle}
-                  />
-                </div>
-              ))}
+        <div className="space-y-2">
+          <SectionHeader title="Calls" />
+          <div className="grid grid-cols-3 gap-3">
+            {[["Calls Made", callsMade, setCallsMade], ["DMs", dms, setDms], ["Call Connects", connects, setConnects]] as const}
+            {([["Calls Made", callsMade, setCallsMade], ["DMs", dms, setDms], ["Call Connects", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+              <div key={label} className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+                <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
+                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <SectionHeader title="Pipeline" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {([["Appt Sets", set, setSet], ["Demos Showed", show, setShow], ["Sales", sales, setSales]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+              <div key={label} className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+                <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
+                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
+              </div>
+            ))}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
+              <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
+                placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
             </div>
           </div>
-        ))}
+        </div>
 
         <Button type="submit" disabled={isPending}
           className="w-full h-11 font-semibold rounded-xl text-sm"
@@ -226,20 +221,15 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1"
           style={{ color: "rgba(252,211,77,0.6)" }}>Money Generated · This Month</p>
         <p className="text-5xl font-black tabular-nums" style={{ color: "#fcd34d" }}>
-          {fmt$.format(p.cash)}
+          {fmt$.format(p.collections)}
         </p>
         <div className="flex items-center gap-4 mt-3">
           <span className="text-sm font-semibold" style={{ color: "rgba(252,211,77,0.7)" }}>
-            {p.close} {p.close === 1 ? "deal" : "deals"} closed
+            {p.sales} {p.sales === 1 ? "deal" : "deals"} closed
           </span>
-          {p.close > 0 && (
+          {p.sales > 0 && (
             <span className="text-sm" style={{ color: "rgba(252,211,77,0.5)" }}>
-              · avg {fmt$.format(Math.round(p.cash / p.close))} / deal
-            </span>
-          )}
-          {p.refunds > 0 && (
-            <span className="text-sm" style={{ color: "rgba(248,113,113,0.7)" }}>
-              · {fmt$.format(p.refunds)} refunds
+              · avg {fmt$.format(Math.round(p.collections / p.sales))} / deal
             </span>
           )}
         </div>
@@ -248,11 +238,10 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
       {/* Calls */}
       <div className="space-y-3">
         <SectionHeader title="Calls" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricTile label="Made"    value={String(p.made)} gold icon={Phone} />
-          <MetricTile label="Ans"     value={String(p.ans)}       icon={Phone} />
-          <MetricTile label="Ans %"   value={`${p.ansRate}%`}     icon={TrendingUp} />
-          <MetricTile label="Leads"   value={String(p.leads)}     icon={Users} />
+        <div className="grid grid-cols-3 gap-3">
+          <MetricTile label="Calls Made"    value={String(p.callsMade)} gold icon={Phone} />
+          <MetricTile label="DMs"           value={String(p.dms)}       icon={MessageSquare} />
+          <MetricTile label="Call Connects" value={String(p.connects)}  icon={Phone} />
         </div>
       </div>
 
@@ -260,20 +249,10 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
       <div className="space-y-3">
         <SectionHeader title="Pipeline" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricTile label="Set"      value={String(p.set)}          icon={Calendar} />
-          <MetricTile label="Show"     value={`${p.show} · ${p.showRate}%`}   icon={Eye} />
-          <MetricTile label="Pitch"    value={`${p.pitch} · ${p.pitchRate}%`} icon={Target} />
-          <MetricTile label="Close"    value={`${p.close} · ${p.closeRate}%`} gold icon={DollarSign} />
-        </div>
-      </div>
-
-      {/* Rates */}
-      <div className="space-y-3">
-        <SectionHeader title="Conversion rates" />
-        <div className="grid grid-cols-3 gap-3">
-          <MetricTile label="NS"          value={String(p.ns)}           red icon={AlertTriangle} />
-          <MetricTile label="Cancelled"   value={String(p.can)}          icon={AlertTriangle} />
-          <MetricTile label="Demo → Close" value={`${p.demoToClose}%`}   icon={TrendingUp} />
+          <MetricTile label="Appt Sets"    value={String(p.set)}                   icon={Calendar} />
+          <MetricTile label="Show Rate"    value={`${p.show} · ${p.showRate}%`}    icon={Eye} />
+          <MetricTile label="Sales"        value={String(p.sales)}                 gold icon={Target} />
+          <MetricTile label="Close Rate"   value={`${p.closeRate}%`}               icon={TrendingUp} />
         </div>
       </div>
 
@@ -416,7 +395,7 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
     return () => { clearInterval(refreshId); clearInterval(tickId); };
   }, [router]);
 
-  const isProduction = "made" in metrics;
+  const isProduction = "callsMade" in metrics && "collections" in metrics;
 
   return (
     <div className="flex h-full w-full"
