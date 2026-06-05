@@ -19,7 +19,8 @@ export default async function StaffPage() {
 
   return (
     <StaffDashboardClient
-      metrics={metrics}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      metrics={metrics as any}
       role={staffRole}
       repName={name}
     />

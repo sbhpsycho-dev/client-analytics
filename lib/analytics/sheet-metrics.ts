@@ -70,12 +70,29 @@ export interface RepSheetConfig {
   repName: string;
 }
 
+export interface RepProductionStats {
+  name: string;
+  sheetId: string;
+  callsMade: number;
+  dms: number;
+  callConnects: number;
+  appointmentSets: number;
+  demosShowed: number;
+  noShows: number;
+  showRate: number;
+  sales: number;
+  collections: number;
+  commissions: number;
+  callsTrend: number[];   // daily calls for current month so far
+}
+
 export interface SheetMetrics {
   dashboard: DashboardMetrics;
   pipeline: PipelineRep[];
   leaderboard: LeaderboardRep[];
   setterStats: SetterStats[];
   closerStats: CloserStats[];
+  repStats: RepProductionStats[];
   live: boolean;
   lastFetched: string;
 }
@@ -108,6 +125,97 @@ const MOCK_LEADERBOARD: LeaderboardRep[] = [];
 const MOCK_SETTER_STATS: SetterStats[] = [];
 
 const MOCK_CLOSER_STATS: CloserStats[] = [];
+
+const MOCK_REP_STATS: RepProductionStats[] = [];
+
+// ── Production sheet helpers ──────────────────────────────────────────────────
+
+const MONTH_NAMES = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE",
+                     "JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+
+function getCurrentMonthTab(): string {
+  return MONTH_NAMES[new Date().getMonth()];
+}
+
+function isProductionSheet(tabs: string[]): boolean {
+  const upper = tabs.map(t => t.toUpperCase().trim());
+  return MONTH_NAMES.some(m => upper.includes(m));
+}
+
+interface ProductionRow {
+  day: number;
+  callsMade: number;
+  dms: number;
+  callConnects: number;
+  appointmentSets: number;
+  demosShowed: number;
+  introUnits: number;
+  majorUnits: number;
+  sales: number;
+  collections: number;
+  commissions: number;
+}
+
+function parseNum(v: string | undefined): number {
+  if (!v) return 0;
+  const n = parseFloat(v.toString().replace(/[$,\s]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
+function parseProductionSheetRows(raw: string[][]): ProductionRow[] {
+  // Row 0 = company name, Row 1 = headers, Rows 2+ = daily data
+  const rows: ProductionRow[] = [];
+  for (let i = 2; i < raw.length; i++) {
+    const r = raw[i];
+    const day = parseNum(r[0]);
+    if (day < 1 || day > 31) continue; // skip subtotal/total rows
+    rows.push({
+      day,
+      callsMade:      parseNum(r[1]),
+      dms:            parseNum(r[2]),
+      callConnects:   parseNum(r[3]),
+      appointmentSets:parseNum(r[4]),
+      demosShowed:    parseNum(r[5]),
+      introUnits:     parseNum(r[6]),
+      majorUnits:     parseNum(r[7]),
+      sales:          parseNum(r[8]),
+      collections:    parseNum(r[9]),
+      commissions:    parseNum(r[11]),
+    });
+  }
+  return rows;
+}
+
+function computeRepProductionStats(
+  rows: ProductionRow[],
+  name: string,
+  sheetId: string
+): RepProductionStats {
+  const sum = (field: keyof ProductionRow) =>
+    rows.reduce((s, r) => s + (r[field] as number), 0);
+
+  const callsMade       = sum("callsMade");
+  const appointmentSets = sum("appointmentSets");
+  const demosShowed     = sum("demosShowed");
+  const sales           = sum("sales");
+  const callsTrend      = rows.slice(0, 31).map(r => r.callsMade);
+
+  return {
+    name,
+    sheetId,
+    callsMade,
+    dms:            sum("dms"),
+    callConnects:   sum("callConnects"),
+    appointmentSets,
+    demosShowed,
+    noShows:        Math.max(0, appointmentSets - demosShowed),
+    showRate:       appointmentSets > 0 ? Math.round((demosShowed / appointmentSets) * 100) : 0,
+    sales,
+    collections:    sum("collections"),
+    commissions:    sum("commissions"),
+    callsTrend,
+  };
+}
 
 // ── Column detection ──────────────────────────────────────────────────────────
 
@@ -419,6 +527,99 @@ function computeCloserStats(rows: ParsedRow[]): CloserStats[] {
   return stats;
 }
 
+// ── Metrics builders ──────────────────────────────────────────────────────────
+
+function buildLegacyMetrics(allRows: ParsedRow[]): SheetMetrics {
+  const pipeline    = computePipeline(allRows);
+  const leaderboard = computeLeaderboard(allRows);
+  const dashboard   = computeDashboard(allRows);
+  const setterStats = computeSetterStats(allRows);
+  const closerStats = computeCloserStats(allRows);
+  return {
+    dashboard,
+    pipeline:    pipeline.length    > 0 ? pipeline    : MOCK_PIPELINE,
+    leaderboard: leaderboard.length > 0 ? leaderboard : MOCK_LEADERBOARD,
+    setterStats: setterStats.length > 0 ? setterStats : MOCK_SETTER_STATS,
+    closerStats: closerStats.length > 0 ? closerStats : MOCK_CLOSER_STATS,
+    repStats:    [],
+    live: true,
+    lastFetched: new Date().toISOString(),
+  };
+}
+
+async function getProductionMetrics(sheets: RepSheetConfig[]): Promise<SheetMetrics> {
+  const monthTab = getCurrentMonthTab();
+
+  const perRep = await Promise.all(
+    sheets.map(async ({ sheetId, repName }, i) => {
+      const raw = await sheetGet(sheetId, `${monthTab}!A:L`);
+      const rows = parseProductionSheetRows(raw);
+      return computeRepProductionStats(rows, repName || `Rep ${i + 1}`, sheetId);
+    })
+  );
+
+  const total = (field: keyof RepProductionStats) =>
+    perRep.reduce((s, r) => s + (typeof r[field] === "number" ? (r[field] as number) : 0), 0);
+
+  const totalCollections  = total("collections");
+  const totalSales        = total("sales");
+  const totalCalls        = total("callsMade");
+  const totalApptSets     = total("appointmentSets");
+
+  const dashboard: DashboardMetrics = {
+    cashCollectedMTD:    totalCollections,
+    netRevenueMTD:       totalCollections,
+    leadsThisMonth:      totalApptSets,
+    totalDealsClosed:    totalSales,
+    costPerClose:        0,
+    mrr:                 totalCollections,
+    cashCollectedYTD:    totalCollections,
+    totalRefundMTD:      0,
+    avgLeadResponseTime: "—",
+    cashTrend:           [0, 0, 0, 0, 0, totalCollections],
+    mrrTrend:            [0, 0, 0, 0, 0, totalCollections],
+    deltas: {
+      cashCollectedMTD: 0, netRevenueMTD: 0, leadsThisMonth: 0,
+      totalDealsClosed: 0, costPerClose: 0, mrr: 0,
+      cashCollectedYTD: 0, totalRefundMTD: 0,
+    },
+  };
+
+  const pipeline: PipelineRep[] = perRep.map((r, i) => ({
+    name:          r.name,
+    color:         REP_COLORS[i % REP_COLORS.length],
+    callsMade:     r.callsMade,
+    callsAnswered: r.callConnects,
+    demosSet:      r.appointmentSets,
+    demosShowed:   r.demosShowed,
+    pitched:       r.demosShowed,
+    closed:        r.sales,
+  }));
+
+  const leaderboard: LeaderboardRep[] = perRep
+    .sort((a, b) => b.collections - a.collections)
+    .map((r, i) => ({
+      name:         r.name,
+      color:        REP_COLORS[i % REP_COLORS.length],
+      cashCollected:r.collections,
+      dealsClosed:  r.sales,
+      callsMade:    r.callsMade,
+      closeRate:    r.callsMade > 0 ? Math.round((r.sales / r.callsMade) * 100) : 0,
+      avgDealSize:  r.sales > 0 ? Math.round(r.collections / r.sales) : 0,
+    }));
+
+  return {
+    dashboard,
+    pipeline,
+    leaderboard,
+    setterStats: [],
+    closerStats: [],
+    repStats:    perRep,
+    live: true,
+    lastFetched: new Date().toISOString(),
+  };
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 const PREFERRED_TABS = ["calls", "all calls", "data", "pipeline", "sales", "main", "sheet1"];
@@ -430,6 +631,7 @@ export async function getSheetMetrics(repSheets?: RepSheetConfig[]): Promise<She
     leaderboard: MOCK_LEADERBOARD,
     setterStats: MOCK_SETTER_STATS,
     closerStats: MOCK_CLOSER_STATS,
+    repStats:    MOCK_REP_STATS,
     live: false,
     lastFetched: new Date().toISOString(),
   };
@@ -440,53 +642,41 @@ export async function getSheetMetrics(repSheets?: RepSheetConfig[]): Promise<She
     // Auto-load rep sheets from env if caller didn't provide them
     const sheets = repSheets ?? parseEnvRepSheets();
 
-    let allRows: ParsedRow[] = [];
-
     if (sheets && sheets.length > 0) {
-      // Aggregate rows from each rep's individual sheet
+      // Check if these are production sheets (month-named tabs)
+      const firstTabs = await sheetMeta(sheets[0].sheetId);
+      if (isProductionSheet(firstTabs)) {
+        return await getProductionMetrics(sheets);
+      }
+
+      // Legacy setter/closer format
       const perRepRows = await Promise.all(
         sheets.map(({ sheetId, tab }) => fetchSheetRows(sheetId, tab || undefined))
       );
-      allRows = perRepRows.flat();
-    } else {
-      // Fall back to the master sheet
-      const tabs = await sheetMeta(SHEET_ID);
-      if (tabs.length === 0) return fallback;
-
-      const lower = tabs.map(t => t.toLowerCase());
-      let tabName = tabs[0];
-      for (const pref of PREFERRED_TABS) {
-        const idx = lower.findIndex(t => t.includes(pref));
-        if (idx !== -1) { tabName = tabs[idx]; break; }
-      }
-
-      const raw = await sheetGet(SHEET_ID, `${tabName}!A:Z`);
-      if (raw.length < 2) return fallback;
-
-      const headers = raw[0].map(h => h?.toString() ?? "");
-      const cols    = detectCols(headers);
-      allRows = parseRows(raw.slice(1), cols);
+      const allRows = perRepRows.flat();
+      if (allRows.length === 0) return fallback;
+      return buildLegacyMetrics(allRows);
     }
 
+    // Fall back to master sheet (legacy format)
+    const tabs = await sheetMeta(SHEET_ID);
+    if (tabs.length === 0) return fallback;
+
+    const lower = tabs.map(t => t.toLowerCase());
+    let tabName = tabs[0];
+    for (const pref of PREFERRED_TABS) {
+      const idx = lower.findIndex(t => t.includes(pref));
+      if (idx !== -1) { tabName = tabs[idx]; break; }
+    }
+
+    const raw = await sheetGet(SHEET_ID, `${tabName}!A:Z`);
+    if (raw.length < 2) return fallback;
+
+    const headers = raw[0].map(h => h?.toString() ?? "");
+    const cols    = detectCols(headers);
+    const allRows = parseRows(raw.slice(1), cols);
     if (allRows.length === 0) return fallback;
-
-    const pipeline    = computePipeline(allRows);
-    const leaderboard = computeLeaderboard(allRows);
-    const dashboard   = computeDashboard(allRows);
-    const setterStats = computeSetterStats(allRows);
-    const closerStats = computeCloserStats(allRows);
-
-    if (pipeline.length === 0 && dashboard.leadsThisMonth === 0) return fallback;
-
-    return {
-      dashboard,
-      pipeline:    pipeline.length    > 0 ? pipeline    : MOCK_PIPELINE,
-      leaderboard: leaderboard.length > 0 ? leaderboard : MOCK_LEADERBOARD,
-      setterStats: setterStats.length > 0 ? setterStats : MOCK_SETTER_STATS,
-      closerStats: closerStats.length > 0 ? closerStats : MOCK_CLOSER_STATS,
-      live: true,
-      lastFetched: new Date().toISOString(),
-    };
+    return buildLegacyMetrics(allRows);
   } catch {
     return fallback;
   }
@@ -499,8 +689,19 @@ export async function getStaffMetrics(
   role: "setter" | "closer",
   sheetId?: string,
   sheetTab?: string
-): Promise<SetterStats | CloserStats> {
+): Promise<SetterStats | CloserStats | RepProductionStats> {
   try {
+    // Check if this is a production sheet
+    if (sheetId && hasGoogleAuth()) {
+      const tabs = await sheetMeta(sheetId);
+      if (isProductionSheet(tabs)) {
+        const monthTab = getCurrentMonthTab();
+        const raw = await sheetGet(sheetId, `${monthTab}!A:L`);
+        const rows = parseProductionSheetRows(raw);
+        return computeRepProductionStats(rows, staffName, sheetId);
+      }
+    }
+
     let rows: ParsedRow[] = [];
 
     if (sheetId && hasGoogleAuth()) {

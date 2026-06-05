@@ -22,9 +22,30 @@ export async function POST(req: Request) {
   const { date } = body;
   if (!date) return NextResponse.json({ error: "Date is required" }, { status: 400 });
 
-  // Build the row to append based on role
+  // Production sheet format (Fadi/Conner/Kevin style):
+  // Col A: Day of Month, B: Calls Made, C: DMs, D: Call Connects,
+  // E: Appointment Sets, F: Demos Showed, G: Intro Units, H: Major Units,
+  // I: Sales, J: Collections, K: Terms/Status, L: Overall Total Commissions
+  const isProductionFormat = "callsMade" in body || "appointmentSets" in body;
+
   let row: string[];
-  if (staffRole === "setter") {
+  if (isProductionFormat) {
+    const day = new Date(date).getDate();
+    row = [
+      String(day),
+      String(body.callsMade       ?? 0),
+      String(body.dms             ?? 0),
+      String(body.callConnects    ?? 0),
+      String(body.appointmentSets ?? 0),
+      String(body.demosShowed     ?? 0),
+      String(body.introUnits      ?? 0),
+      String(body.majorUnits      ?? 0),
+      String(body.sales           ?? 0),
+      String(body.collections     ?? 0),
+      body.termsStatus ?? "",
+      String(body.commissions     ?? 0),
+    ];
+  } else if (staffRole === "setter") {
     const { callsBooked = 0, demosScheduled = 0 } = body;
     row = [date, name ?? "", "setter", String(callsBooked), String(demosScheduled)];
   } else {
@@ -32,17 +53,19 @@ export async function POST(req: Request) {
     row = [date, name ?? "", "closer", String(callsMade), String(dealsClosed), String(cashCollected)];
   }
 
-  // Use the service account token — it has access to all rep sheets
   const accessToken = await getServiceAccountToken();
   if (!accessToken) {
     return NextResponse.json(
-      { error: "Google service account not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in your environment." },
+      { error: "Google service account not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_REFRESH_TOKEN." },
       { status: 500 }
     );
   }
 
+  // For production sheets, use current month tab; otherwise use configured tab
+  const tab = sheetTab ?? "Sheet1";
+
   try {
-    await sheetsAppend(accessToken, sheetId, `${sheetTab ?? "Sheet1"}!A:Z`, [row]);
+    await sheetsAppend(accessToken, sheetId, `${tab}!A:L`, [row]);
     return NextResponse.json({ success: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

@@ -10,7 +10,7 @@ import {
   DollarSign, Target, TrendingUp, Users, AlertTriangle,
   ChevronDown, ChevronUp, Send,
 } from "lucide-react";
-import type { SetterStats, CloserStats } from "@/lib/analytics/sheet-metrics";
+import type { SetterStats, CloserStats, RepProductionStats } from "@/lib/analytics/sheet-metrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -211,10 +211,64 @@ function LogNumbersForm({ role }: { role: "setter" | "closer" }) {
   );
 }
 
+// ── Production sheet view ─────────────────────────────────────────────────────
+
+function ProductionView({ p, repName, countdown }: { p: RepProductionStats; repName: string; countdown: number }) {
+  return (
+    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "#dce8f4" }}>{repName}'s Dashboard</h1>
+          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>Personal production · this month · refreshing in {countdown}s</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
+          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
+          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+          Live · refreshing in {countdown}s
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeader title="Calls & activity" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricTile label="Calls Made" value={String(p.callsMade)} gold icon={Target} />
+          <MetricTile label="Call Connects" value={String(p.callConnects)} icon={Users} />
+          <MetricTile label="Appt Sets" value={String(p.appointmentSets)} icon={TrendingUp} />
+          <MetricTile label="DMs Sent" value={String(p.dms)} icon={Users} />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeader title="Demos & sales" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricTile label="Demos Showed" value={String(p.demosShowed)} icon={Users} />
+          <MetricTile label="No Shows" value={String(p.noShows)} red icon={AlertTriangle} />
+          <MetricTile label="Show Rate" value={`${p.showRate}%`} icon={TrendingUp} />
+          <MetricTile label="Sales" value={String(p.sales)} gold icon={Target} />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeader title="Revenue" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+          <MetricTile label="Collections" value={fmt$.format(p.collections)} gold icon={DollarSign} />
+          <MetricTile label="Commissions" value={fmt$.format(p.commissions)} icon={DollarSign} />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeader title="Daily calls · this month" />
+        <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 30)} color="#1D9E75"
+          formatter={v => String(v)} />
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  metrics: SetterStats | CloserStats;
+  metrics: SetterStats | CloserStats | RepProductionStats;
   role: "setter" | "closer";
   repName: string;
 }
@@ -230,6 +284,11 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
     }, 1000);
     return () => { clearInterval(refreshId); clearInterval(tickId); };
   }, [router]);
+
+  // Production sheet reps have appointmentSets field
+  if ("appointmentSets" in metrics) {
+    return <ProductionView p={metrics as RepProductionStats} repName={repName} countdown={countdown} />;
+  }
 
   const isSetter = role === "setter";
   const s = metrics as SetterStats;
