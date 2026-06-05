@@ -7,9 +7,9 @@ import {
   LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import {
+  BarChart2, ClipboardList,
   DollarSign, Target, TrendingUp, Users, AlertTriangle,
-  Phone, MessageSquare, Calendar, Eye, BarChart2,
-  ChevronDown, ChevronUp, Send,
+  Phone, MessageSquare, Calendar, Eye,
 } from "lucide-react";
 import type { SetterStats, CloserStats, RepProductionStats } from "@/lib/analytics/sheet-metrics";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,13 @@ const CHART_TOOLTIP = {
   cursor: { stroke: "rgba(180,210,240,0.1)", strokeWidth: 1 },
 };
 
+const NAVY_BORDER = "rgba(180,210,240,0.08)";
+const NAVY_ACTIVE  = "rgba(42,68,114,0.5)";
+const NAVY_HOVER   = "rgba(42,68,114,0.25)";
+
 const fmt$ = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+// ── Primitives ────────────────────────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -47,41 +53,36 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function MetricTile({ label, value, sub, gold = false, red = false, icon: Icon }: {
-  label: string; value: string; sub?: string;
-  gold?: boolean; red?: boolean; icon?: React.ElementType;
+function MetricTile({ label, value, gold = false, red = false, icon: Icon }: {
+  label: string; value: string; gold?: boolean; red?: boolean; icon?: React.ElementType;
 }) {
-  const accentColor = gold ? "#fcd34d" : red ? "#f87171" : "rgba(74,122,181,0.6)";
+  const accent = gold ? "#fcd34d" : red ? "#f87171" : "rgba(74,122,181,0.6)";
   return (
-    <div className="rounded-xl p-5 transition-all duration-200 hover:brightness-110 cursor-default"
-      style={{ ...(gold ? GOLD_CARD : CARD), borderLeft: `3px solid ${accentColor}` }}>
-      <div className="flex items-start justify-between mb-2">
+    <div className="rounded-xl p-4 transition-all hover:brightness-110 cursor-default"
+      style={{ ...(gold ? GOLD_CARD : CARD), borderLeft: `3px solid ${accent}` }}>
+      <div className="flex items-start justify-between mb-1.5">
         <p className="text-[10px] font-bold uppercase tracking-[0.15em]"
           style={{ color: gold ? "rgba(252,211,77,0.6)" : red ? "rgba(248,113,113,0.6)" : "#5a7a9a" }}>{label}</p>
-        {Icon && <Icon className="h-4 w-4 shrink-0"
+        {Icon && <Icon className="h-3.5 w-3.5 shrink-0"
           style={{ color: gold ? "rgba(252,211,77,0.35)" : red ? "rgba(248,113,113,0.35)" : "rgba(74,122,181,0.35)" }} />}
       </div>
       <p className="text-2xl font-black tabular-nums leading-none"
         style={{ color: gold ? "#fcd34d" : red ? "#f87171" : "#dce8f4" }}>{value}</p>
-      {sub && <p className="mt-1.5 text-xs" style={{ color: "#4a6a8a" }}>{sub}</p>}
     </div>
   );
 }
 
-function TrendChart({ title, data, color, formatter }: {
-  title: string; data: number[]; color: string; formatter?: (v: number) => string;
-}) {
+function TrendChart({ title, data, color }: { title: string; data: number[]; color: string }) {
   const pts = data.map((v, i) => ({ i: i + 1, v }));
   return (
     <div className="rounded-xl p-5" style={CARD}>
       <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>{title}</p>
-      <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={pts} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+      <ResponsiveContainer width="100%" height={160}>
+        <LineChart data={pts} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
-          <XAxis dataKey="i" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false}
-            tickFormatter={formatter ?? (v => String(v))} />
-          <Tooltip {...CHART_TOOLTIP} formatter={(v) => [formatter ? formatter(Number(v)) : String(v), title]} />
+          <XAxis dataKey="i" tick={{ fill: "#4a6a8a", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: "#4a6a8a", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <Tooltip {...CHART_TOOLTIP} formatter={(v) => [String(v), title]} />
           <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2.5} dot={false}
             activeDot={{ r: 4, fill: color }} />
         </LineChart>
@@ -90,10 +91,9 @@ function TrendChart({ title, data, color, formatter }: {
   );
 }
 
-// ── Production log form ───────────────────────────────────────────────────────
+// ── Today's Numbers form ──────────────────────────────────────────────────────
 
-function ProductionLogForm() {
-  const [open, setOpen] = useState(false);
+function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [callsMade, setCallsMade] = useState("");
   const [dms, setDms] = useState("");
@@ -130,9 +130,11 @@ function ProductionLogForm() {
       if (!res.ok) { toast.error(data.error ?? "Failed to submit"); return; }
       toast.success("Numbers logged to your sheet");
       reset();
-      setOpen(false);
+      onSubmitted();
     });
   }
+
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   const inputStyle: React.CSSProperties = {
     background: "rgba(255,255,255,0.04)",
@@ -141,33 +143,33 @@ function ProductionLogForm() {
   };
 
   const fields = [
-    { label: "Calls Made",    value: callsMade,       set: setCallsMade,       icon: Phone },
-    { label: "DMs",           value: dms,             set: setDms,             icon: MessageSquare },
-    { label: "Call Connects", value: callConnects,    set: setCallConnects,    icon: Phone },
-    { label: "Appt Sets",     value: appointmentSets, set: setAppointmentSets, icon: Calendar },
-    { label: "Demos Showed",  value: demosShowed,     set: setDemosShowed,     icon: Eye },
-    { label: "Sales",         value: sales,           set: setSales,           icon: Target },
+    { label: "Calls Made",    value: callsMade,       set: setCallsMade },
+    { label: "DMs",           value: dms,             set: setDms },
+    { label: "Call Connects", value: callConnects,    set: setCallConnects },
+    { label: "Appt Sets",     value: appointmentSets, set: setAppointmentSets },
+    { label: "Demos Showed",  value: demosShowed,     set: setDemosShowed },
+    { label: "Sales",         value: sales,           set: setSales },
   ];
 
   return (
-    <div className="rounded-xl overflow-hidden" style={CARD}>
-      <button onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full px-5 py-4 text-sm font-semibold transition-all"
-        style={{ color: "#a8bdd4" }}>
-        <Send className="h-4 w-4" style={{ color: "#4a7ab5" }} />
-        Log Today's Numbers
-        {open
-          ? <ChevronUp className="h-4 w-4 ml-auto opacity-40" />
-          : <ChevronDown className="h-4 w-4 ml-auto opacity-40" />}
-      </button>
-      {open && (
-        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t"
-          style={{ borderColor: "rgba(180,210,240,0.08)" }}>
-          <div className="pt-4 space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)}
-              required className="h-10 rounded-lg text-sm" style={inputStyle} />
-          </div>
+    <div className="p-6 space-y-6 max-w-2xl mx-auto w-full">
+      {/* Header */}
+      <div>
+        <h2 className="text-lg font-bold" style={{ color: "#dce8f4" }}>Log Today's Numbers</h2>
+        <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>{today}</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Date */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)}
+            required className="h-10 rounded-lg text-sm max-w-xs" style={inputStyle} />
+        </div>
+
+        {/* Number fields */}
+        <div className="space-y-1.5">
+          <SectionHeader title="Activity" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {fields.map(({ label, value, set }) => (
               <div key={label} className="space-y-1">
@@ -176,47 +178,41 @@ function ProductionLogForm() {
                   placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
               </div>
             ))}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
-              <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
-                placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-            </div>
           </div>
-          <div className="flex gap-2 pt-1">
-            <Button type="submit" disabled={isPending} className="h-9 px-5 text-sm font-semibold rounded-lg"
-              style={{
-                background: "linear-gradient(135deg, #1e3a6e 0%, #2a4f8a 50%, #1e3f7a 100%)",
-                border: "1px solid rgba(180,210,240,0.18)",
-                color: "#dce8f4",
-                boxShadow: "0 4px 20px rgba(26,50,110,0.45)",
-              }}>
-              {isPending ? "Submitting..." : "Submit to Sheet"}
-            </Button>
-            <Button type="button" onClick={() => { reset(); setOpen(false); }}
-              className="h-9 px-4 text-sm rounded-lg"
-              style={{ background: "transparent", border: "1px solid rgba(180,210,240,0.1)", color: "#4a6a8a" }}>
-              Cancel
-            </Button>
+        </div>
+
+        {/* Collections */}
+        <div className="space-y-1.5">
+          <SectionHeader title="Revenue" />
+          <div className="max-w-[200px] space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
+            <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
+              placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
           </div>
-        </form>
-      )}
+        </div>
+
+        <Button type="submit" disabled={isPending}
+          className="w-full h-11 font-semibold rounded-xl text-sm"
+          style={{
+            background: "linear-gradient(135deg, #1e3a6e 0%, #2a4f8a 50%, #1e3f7a 100%)",
+            border: "1px solid rgba(180,210,240,0.18)",
+            color: "#dce8f4",
+            boxShadow: "0 4px 20px rgba(26,50,110,0.45)",
+          }}>
+          {isPending ? "Submitting…" : "Submit to Sheet"}
+        </Button>
+      </form>
     </div>
   );
 }
 
-// ── Production view ───────────────────────────────────────────────────────────
+// ── Pipeline tab content ──────────────────────────────────────────────────────
 
-function ProductionView({ p, repName, countdown }: {
-  p: RepProductionStats; repName: string; countdown: number;
-}) {
+function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: number }) {
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "#dce8f4" }}>{repName}'s Dashboard</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>Personal production · this month · refreshing in {countdown}s</p>
-        </div>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
+      {/* Live badge */}
+      <div className="flex justify-end">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
           style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
           <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
@@ -224,10 +220,29 @@ function ProductionView({ p, repName, countdown }: {
         </span>
       </div>
 
+      {/* Money generated — full-width gold card */}
+      <div className="rounded-xl p-6" style={GOLD_CARD}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1"
+          style={{ color: "rgba(252,211,77,0.6)" }}>Money Generated · This Month</p>
+        <p className="text-5xl font-black tabular-nums" style={{ color: "#fcd34d" }}>
+          {fmt$.format(p.collections)}
+        </p>
+        <div className="flex items-center gap-4 mt-3">
+          <span className="text-sm font-semibold" style={{ color: "rgba(252,211,77,0.7)" }}>
+            {p.sales} {p.sales === 1 ? "deal" : "deals"} closed
+          </span>
+          {p.sales > 0 && (
+            <span className="text-sm" style={{ color: "rgba(252,211,77,0.5)" }}>
+              · avg {fmt$.format(Math.round(p.collections / p.sales))} / deal
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Activity */}
       <div className="space-y-3">
         <SectionHeader title="Activity" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricTile label="Calls Made"    value={String(p.callsMade)}       gold icon={Phone} />
           <MetricTile label="Call Connects" value={String(p.callConnects)}    icon={Phone} />
           <MetricTile label="Appt Sets"     value={String(p.appointmentSets)} icon={Calendar} />
@@ -235,23 +250,14 @@ function ProductionView({ p, repName, countdown }: {
         </div>
       </div>
 
-      {/* Demos & Sales */}
+      {/* Demos & Conversion */}
       <div className="space-y-3">
-        <SectionHeader title="Demos & Sales" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <MetricTile label="Demos Showed" value={String(p.demosShowed)} icon={Eye} />
-          <MetricTile label="No Shows"     value={String(p.noShows)}     icon={AlertTriangle} red />
-          <MetricTile label="Show Rate"    value={`${p.showRate}%`}      icon={BarChart2} />
-          <MetricTile label="Sales"        value={String(p.sales)}       icon={Target} gold />
-        </div>
-      </div>
-
-      {/* Revenue */}
-      <div className="space-y-3">
-        <SectionHeader title="Revenue" />
-        <div className="grid grid-cols-2 gap-4">
-          <MetricTile label="Collections"  value={fmt$.format(p.collections)} gold icon={DollarSign} />
-          <MetricTile label="Commissions"  value={fmt$.format(p.commissions)} icon={DollarSign} />
+        <SectionHeader title="Demos & Conversion" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricTile label="Demos Showed" value={String(p.demosShowed)}  icon={Eye} />
+          <MetricTile label="No Shows"     value={String(p.noShows)}      red icon={AlertTriangle} />
+          <MetricTile label="Show Rate"    value={`${p.showRate}%`}       icon={TrendingUp} />
+          <MetricTile label="Sales"        value={String(p.sales)}        icon={Target} gold />
         </div>
       </div>
 
@@ -260,19 +266,116 @@ function ProductionView({ p, repName, countdown }: {
         <SectionHeader title="Daily calls · this month" />
         <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 31)} color="#4a7ab5" />
       </div>
-
-      {/* Log numbers */}
-      <div className="space-y-3">
-        <SectionHeader title="Submit numbers" />
-        <ProductionLogForm />
-      </div>
-
-      <div className="pb-2">
-        <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
-          Leadwell Advisors Analytics Platform &nbsp;·&nbsp; A Stack N Scale managed client
-        </p>
-      </div>
     </div>
+  );
+}
+
+// ── Legacy view (setter/closer without production sheet) ──────────────────────
+
+function LegacyView({ metrics, role, countdown }: {
+  metrics: SetterStats | CloserStats; role: "setter" | "closer"; countdown: number;
+}) {
+  const isSetter = role === "setter";
+  const s = metrics as SetterStats;
+  const c = metrics as CloserStats;
+
+  return (
+    <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex justify-end">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
+          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
+          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+          Live · refreshing in {countdown}s
+        </span>
+      </div>
+      <div className="space-y-3">
+        <SectionHeader title="Your numbers · this month" />
+        {isSetter ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricTile label="Calls Booked" value={String(s.callsBooked)}   gold icon={Target} />
+            <MetricTile label="Demos Showed" value={String(s.demosShowed)}   icon={Users} />
+            <MetricTile label="No Shows"     value={String(s.noShows)}       red icon={AlertTriangle} />
+            <MetricTile label="Show Rate"    value={`${s.showRate}%`}        icon={TrendingUp} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricTile label="Cash Collected" value={fmt$.format(c.cashCollected)} gold icon={DollarSign} />
+            <MetricTile label="Deals Closed"   value={String(c.dealsClosed)}        icon={Target} />
+            <MetricTile label="Close Rate"     value={`${c.closeRate}%`}            icon={TrendingUp} />
+            <MetricTile label="Avg Deal Size"  value={fmt$.format(c.avgDealSize)}   icon={DollarSign} />
+          </div>
+        )}
+      </div>
+      {isSetter
+        ? <TrendChart title="Calls Booked" data={s.bookingTrend} color="#4a7ab5" />
+        : <TrendChart title="Cash Collected" data={c.cashTrend} color="#fcd34d" />
+      }
+    </div>
+  );
+}
+
+// ── Sidebar navigation ────────────────────────────────────────────────────────
+
+type Tab = "pipeline" | "today";
+
+const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "pipeline", label: "Pipeline",       icon: BarChart2 },
+  { id: "today",    label: "Today's Numbers", icon: ClipboardList },
+];
+
+function StaffSidebar({ active, onChange, repName, role }: {
+  active: Tab; onChange: (t: Tab) => void; repName: string; role: string;
+}) {
+  const initials = repName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <aside className="flex h-full w-52 shrink-0 flex-col"
+      style={{
+        background: "linear-gradient(180deg, #0f1d35 0%, #0d1828 100%)",
+        borderRight: `1px solid ${NAVY_BORDER}`,
+      }}>
+      {/* Rep identity */}
+      <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0 text-sm font-bold"
+          style={{ background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)", color: "#a8bdd4" }}>
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold truncate" style={{ color: "#dce8f4" }}>{repName}</p>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider mt-0.5"
+            style={{ background: "rgba(74,122,181,0.15)", border: "1px solid rgba(74,122,181,0.3)", color: "#7ab5f5" }}>
+            {role}
+          </span>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 p-3 space-y-0.5">
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const isActive = active === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              className="relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all w-full text-left overflow-hidden"
+              style={{
+                color:           isActive ? "#dce8f4" : "#7a9ab8",
+                backgroundColor: isActive ? NAVY_ACTIVE : "transparent",
+              }}
+              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = NAVY_HOVER; }}
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}
+            >
+              {isActive && (
+                <span className="absolute left-0 inset-y-0 w-[3px] rounded-r my-1.5"
+                  style={{ backgroundColor: "#4a7ab5" }} />
+              )}
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
   );
 }
 
@@ -286,6 +389,7 @@ interface Props {
 
 export function StaffDashboardClient({ metrics, role, repName }: Props) {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>("pipeline");
   const [countdown, setCountdown] = useState(Math.round(REFRESH_INTERVAL / 1000));
 
   useEffect(() => {
@@ -296,62 +400,26 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
     return () => { clearInterval(refreshId); clearInterval(tickId); };
   }, [router]);
 
-  if ("appointmentSets" in metrics) {
-    return <ProductionView p={metrics as RepProductionStats} repName={repName} countdown={countdown} />;
-  }
-
-  const isSetter = role === "setter";
-  const s = metrics as SetterStats;
-  const c = metrics as CloserStats;
+  const isProduction = "appointmentSets" in metrics;
 
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "#dce8f4" }}>{repName}'s Dashboard</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>
-            {isSetter ? "Setter" : "Closer"} · personal stats · refreshing in {countdown}s
-          </p>
-        </div>
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
-          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
-          Live · refreshing in {countdown}s
-        </span>
-      </div>
+    <div className="flex h-full w-full"
+      style={{ background: "linear-gradient(180deg, #0a1525 0%, #080f1e 100%)" }}>
 
-      <div className="space-y-3">
-        <SectionHeader title="Your numbers · this month" />
-        {isSetter ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricTile label="Calls Booked"  value={String(s.callsBooked)}   gold icon={Target} />
-            <MetricTile label="Demos Showed"  value={String(s.demosShowed)}   icon={Users} />
-            <MetricTile label="No Shows"      value={String(s.noShows)}       red icon={AlertTriangle} />
-            <MetricTile label="Show Rate"     value={`${s.showRate}%`}        icon={TrendingUp} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricTile label="Cash Collected" value={fmt$.format(c.cashCollected)} gold icon={DollarSign} />
-            <MetricTile label="Deals Closed"   value={String(c.dealsClosed)}        icon={Target} />
-            <MetricTile label="Close Rate"     value={`${c.closeRate}%`}            icon={TrendingUp} />
-            <MetricTile label="Avg Deal Size"  value={fmt$.format(c.avgDealSize)}   icon={DollarSign} />
-          </div>
+      {/* Sidebar */}
+      <StaffSidebar active={tab} onChange={setTab} repName={repName} role={role} />
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === "pipeline" && isProduction && (
+          <PipelineTab p={metrics as RepProductionStats} countdown={countdown} />
         )}
-      </div>
-
-      <div className="space-y-3">
-        <SectionHeader title="Trend · last 6 weeks" />
-        {isSetter
-          ? <TrendChart title="Calls Booked" data={s.bookingTrend} color="#4a7ab5" />
-          : <TrendChart title="Cash Collected" data={c.cashTrend} color="#fcd34d"
-              formatter={v => `$${(v / 1000).toFixed(1)}k`} />
-        }
-      </div>
-
-      <div className="pb-2">
-        <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
-          Leadwell Advisors Analytics Platform &nbsp;·&nbsp; A Stack N Scale managed client
-        </p>
+        {tab === "pipeline" && !isProduction && (
+          <LegacyView metrics={metrics as SetterStats | CloserStats} role={role} countdown={countdown} />
+        )}
+        {tab === "today" && (
+          <TodayForm onSubmitted={() => setTab("pipeline")} />
+        )}
       </div>
     </div>
   );

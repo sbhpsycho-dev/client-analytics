@@ -69,7 +69,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 flex overflow-hidden">{children}</main>
     </div>
   );
 }
