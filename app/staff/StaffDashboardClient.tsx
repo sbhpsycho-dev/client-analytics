@@ -6,207 +6,91 @@ import { toast } from "sonner";
 import {
   LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from "recharts";
-import {
-  DollarSign, Target, TrendingUp, Users, AlertTriangle,
-  ChevronDown, ChevronUp, Send,
-} from "lucide-react";
+import { Phone, MessageSquare, Calendar, Eye, BarChart2, DollarSign, TrendingUp, ChevronDown, ChevronUp, Send } from "lucide-react";
 import type { SetterStats, CloserStats, RepProductionStats } from "@/lib/analytics/sheet-metrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const REFRESH_INTERVAL = 45_000;
 
-// ── Shared styles ─────────────────────────────────────────────────────────────
+// ── SNS Design tokens ─────────────────────────────────────────────────────────
+const BG       = "#0a0a0a";
+const CARD     = "#141414";
+const BORDER   = "rgba(255,255,255,0.08)";
+const ORANGE   = "#f97316";
+const GREEN    = "#22c55e";
+const RED      = "#ef4444";
+const TEXT     = "#ffffff";
+const MUTED    = "#888888";
 
-const CARD: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(17,27,46,0.95) 0%, rgba(11,19,34,0.98) 100%)",
-  border: "1px solid rgba(180,210,240,0.08)",
-  boxShadow: "0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(180,210,240,0.05)",
-};
-
-const GOLD_CARD: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(30,24,8,0.98) 0%, rgba(20,16,4,0.99) 100%)",
-  border: "1px solid rgba(252,211,77,0.18)",
-  boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(252,211,77,0.08)",
-};
-
-const CHART_TOOLTIP = {
-  contentStyle: { background: "#0d1828", border: "1px solid rgba(180,210,240,0.12)", borderRadius: 8, fontSize: 12, color: "#dce8f4" },
-  cursor: { stroke: "rgba(180,210,240,0.1)", strokeWidth: 1 },
+const card: React.CSSProperties = {
+  background: CARD,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 12,
 };
 
 const fmt$ = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "#4a6a8a" }}>{title}</span>
-      <div className="h-px flex-1" style={{ background: "rgba(180,210,240,0.07)" }} />
-    </div>
-  );
-}
+// ── MetricCard (SNS pattern) ──────────────────────────────────────────────────
 
-function MetricTile({ label, value, sub, gold = false, red = false, icon: Icon }: {
-  label: string; value: string; sub?: string; gold?: boolean; red?: boolean; icon?: React.ElementType;
+function MetricCard({ label, value, icon: Icon, accent = "default" }: {
+  label: string;
+  value: string | number;
+  icon?: React.ElementType;
+  accent?: "default" | "orange" | "green" | "red";
 }) {
-  const accentColor = gold ? "#fcd34d" : red ? "#f87171" : "rgba(74,122,181,0.6)";
+  const accentColor = accent === "orange" ? ORANGE : accent === "green" ? GREEN : accent === "red" ? RED : TEXT;
   return (
-    <div className="rounded-xl p-5 transition-all duration-200 hover:brightness-110 cursor-default"
-      style={{ ...(gold ? GOLD_CARD : CARD), borderLeft: `3px solid ${accentColor}` }}>
-      <div className="flex items-start justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em]"
-          style={{ color: gold ? "rgba(252,211,77,0.6)" : red ? "rgba(248,113,113,0.6)" : "#5a7a9a" }}>{label}</p>
-        {Icon && <Icon className="h-4 w-4 shrink-0" style={{ color: gold ? "rgba(252,211,77,0.35)" : red ? "rgba(248,113,113,0.35)" : "rgba(74,122,181,0.35)" }} />}
+    <div className="rounded-xl p-4 flex flex-col gap-2" style={card}>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
+        {Icon && <Icon className="h-3.5 w-3.5" style={{ color: MUTED }} />}
       </div>
-      <p className="text-3xl font-black tabular-nums leading-none"
-        style={{ color: gold ? "#fcd34d" : red ? "#f87171" : "#dce8f4" }}>{value}</p>
-      {sub && <p className="mt-1.5 text-xs" style={{ color: "#4a6a8a" }}>{sub}</p>}
+      <p className="text-2xl font-bold leading-tight tracking-tight" style={{ color: accentColor }}>
+        {value}
+      </p>
     </div>
   );
 }
 
-function TrendChart({ title, data, color, formatter }: {
-  title: string; data: number[]; color: string; formatter?: (v: number) => string;
+// ── Trend chart ───────────────────────────────────────────────────────────────
+
+function TrendChart({ title, data, color = ORANGE, formatter }: {
+  title: string;
+  data: number[];
+  color?: string;
+  formatter?: (v: number) => string;
 }) {
-  const weeks = ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5", "Wk 6"];
-  const pts = data.map((v, i) => ({ week: weeks[i] ?? `Wk ${i + 1}`, value: v }));
+  const pts = data.map((v, i) => ({ i: i + 1, v }));
   return (
-    <div className="rounded-xl p-5" style={CARD}>
-      <p className="text-sm font-semibold mb-4" style={{ color: "#a8bdd4" }}>{title} · last 6 weeks</p>
-      <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={pts} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,210,240,0.06)" vertical={false} />
-          <XAxis dataKey="week" tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: "#4a6a8a", fontSize: 11 }} axisLine={false} tickLine={false}
+    <div className="rounded-xl p-5" style={card}>
+      <p className="text-sm font-semibold mb-4" style={{ color: TEXT }}>{title}</p>
+      <ResponsiveContainer width="100%" height={160}>
+        <LineChart data={pts} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <XAxis dataKey="i" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false}
             tickFormatter={formatter ?? (v => String(v))} />
-          <Tooltip {...CHART_TOOLTIP} formatter={(v) => [formatter ? formatter(Number(v)) : String(v), title]} />
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: color }} />
+          <Tooltip
+            contentStyle={{ background: "#1a1a1a", border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: TEXT }}
+            cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}
+            formatter={(v) => [formatter ? formatter(Number(v)) : String(v), title]}
+          />
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2.5} dot={false}
+            activeDot={{ r: 4, fill: color }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-// ── Log numbers form ──────────────────────────────────────────────────────────
+// ── Section label ─────────────────────────────────────────────────────────────
 
-function LogNumbersForm({ role }: { role: "setter" | "closer" }) {
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [isPending, startTransition] = useTransition();
-
-  // Setter fields
-  const [callsBooked, setCallsBooked] = useState("");
-  const [demosScheduled, setDemosScheduled] = useState("");
-
-  // Closer fields
-  const [callsMade, setCallsMade] = useState("");
-  const [dealsClosed, setDealsClosed] = useState("");
-  const [cashCollected, setCashCollected] = useState("");
-
-  function reset() {
-    setCallsBooked(""); setDemosScheduled("");
-    setCallsMade(""); setDealsClosed(""); setCashCollected("");
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const payload = role === "setter"
-      ? { date, role, callsBooked: Number(callsBooked), demosScheduled: Number(demosScheduled) }
-      : { date, role, callsMade: Number(callsMade), dealsClosed: Number(dealsClosed), cashCollected: Number(cashCollected.replace(/[$,]/g, "")) };
-
-    startTransition(async () => {
-      const res = await fetch("/api/staff/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error ?? "Failed to submit numbers");
-        return;
-      }
-      toast.success("Numbers logged to your sheet");
-      reset();
-      setOpen(false);
-    });
-  }
-
-  const inputStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(180,210,240,0.12)",
-    color: "#dce8f4",
-  };
-
+function Section({ title }: { title: string }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={CARD}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full px-5 py-4 text-sm font-semibold transition-all"
-        style={{ color: "#a8bdd4" }}
-      >
-        <Send className="h-4 w-4" style={{ color: "#4a7ab5" }} />
-        Log Today's Numbers
-        {open ? <ChevronUp className="h-4 w-4 ml-auto opacity-40" /> : <ChevronDown className="h-4 w-4 ml-auto opacity-40" />}
-      </button>
-
-      {open && (
-        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t" style={{ borderColor: "rgba(180,210,240,0.08)" }}>
-          <div className="pt-4 space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)}
-              required className="h-10 rounded-lg text-sm" style={inputStyle} />
-          </div>
-
-          {role === "setter" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Calls Booked</label>
-                <Input type="number" min="0" value={callsBooked} onChange={e => setCallsBooked(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Demos Scheduled</label>
-                <Input type="number" min="0" value={demosScheduled} onChange={e => setDemosScheduled(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Calls Made</label>
-                <Input type="number" min="0" value={callsMade} onChange={e => setCallsMade(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Deals Closed</label>
-                <Input type="number" min="0" value={dealsClosed} onChange={e => setDealsClosed(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Cash Collected ($)</label>
-                <Input type="text" value={cashCollected} onChange={e => setCashCollected(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isPending} className="h-9 px-5 text-sm font-semibold rounded-lg"
-              style={{
-                background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)",
-                border: "1px solid rgba(180,210,240,0.18)",
-                color: "#dce8f4",
-              }}>
-              {isPending ? "Submitting..." : "Submit to Sheet"}
-            </Button>
-            <Button type="button" onClick={() => { reset(); setOpen(false); }}
-              className="h-9 px-4 text-sm rounded-lg"
-              style={{ background: "transparent", border: "1px solid rgba(180,210,240,0.1)", color: "#4a6a8a" }}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
+    <div className="flex items-center gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>{title}</p>
+      <div className="h-px flex-1" style={{ background: BORDER }} />
     </div>
   );
 }
@@ -256,55 +140,62 @@ function ProductionLogForm() {
   }
 
   const inputStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(180,210,240,0.12)",
-    color: "#dce8f4",
+    background: "rgba(255,255,255,0.05)",
+    border: `1px solid ${BORDER}`,
+    color: TEXT,
+    borderRadius: 8,
   };
 
+  const fields = [
+    { label: "Calls Made",    value: callsMade,       set: setCallsMade,       icon: Phone },
+    { label: "DMs",           value: dms,             set: setDms,             icon: MessageSquare },
+    { label: "Call Connects", value: callConnects,    set: setCallConnects,    icon: Phone },
+    { label: "Appt Sets",     value: appointmentSets, set: setAppointmentSets, icon: Calendar },
+    { label: "Demos Showed",  value: demosShowed,     set: setDemosShowed,     icon: Eye },
+    { label: "Sales",         value: sales,           set: setSales,           icon: TrendingUp },
+  ];
+
   return (
-    <div className="rounded-xl overflow-hidden" style={CARD}>
+    <div className="rounded-xl overflow-hidden" style={card}>
       <button onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 w-full px-5 py-4 text-sm font-semibold"
-        style={{ color: "#a8bdd4" }}>
-        <Send className="h-4 w-4" style={{ color: "#4a7ab5" }} />
+        style={{ color: TEXT }}>
+        <Send className="h-4 w-4" style={{ color: ORANGE }} />
         Log Today's Numbers
-        {open ? <ChevronUp className="h-4 w-4 ml-auto opacity-40" /> : <ChevronDown className="h-4 w-4 ml-auto opacity-40" />}
+        {open
+          ? <ChevronUp className="h-4 w-4 ml-auto" style={{ color: MUTED }} />
+          : <ChevronDown className="h-4 w-4 ml-auto" style={{ color: MUTED }} />}
       </button>
 
       {open && (
-        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t" style={{ borderColor: "rgba(180,210,240,0.08)" }}>
+        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t" style={{ borderColor: BORDER }}>
           <div className="pt-4 space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} required className="h-10 rounded-lg text-sm" style={inputStyle} />
+            <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>Date</label>
+            <Input type="date" value={date} onChange={e => setDate(e.target.value)}
+              required className="h-10 rounded-lg text-sm" style={inputStyle} />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: "Calls Made",    value: callsMade,       set: setCallsMade },
-              { label: "DMs",           value: dms,             set: setDms },
-              { label: "Call Connects", value: callConnects,    set: setCallConnects },
-              { label: "Appt Sets",     value: appointmentSets, set: setAppointmentSets },
-              { label: "Demos Showed",  value: demosShowed,     set: setDemosShowed },
-              { label: "Sales",         value: sales,           set: setSales },
-            ].map(({ label, value, set }) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {fields.map(({ label, value, set }) => (
               <div key={label} className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+                <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>{label}</label>
                 <Input type="number" min="0" value={value} onChange={e => set(e.target.value)}
                   placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
               </div>
             ))}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>Collections ($)</label>
               <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
                 placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
             </div>
           </div>
           <div className="flex gap-2 pt-1">
             <Button type="submit" disabled={isPending} className="h-9 px-5 text-sm font-semibold rounded-lg"
-              style={{ background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)", border: "1px solid rgba(180,210,240,0.18)", color: "#dce8f4" }}>
+              style={{ background: ORANGE, border: "none", color: "#fff" }}>
               {isPending ? "Submitting..." : "Submit to Sheet"}
             </Button>
-            <Button type="button" onClick={() => { reset(); setOpen(false); }} className="h-9 px-4 text-sm rounded-lg"
-              style={{ background: "transparent", border: "1px solid rgba(180,210,240,0.1)", color: "#4a6a8a" }}>
+            <Button type="button" onClick={() => { reset(); setOpen(false); }}
+              className="h-9 px-4 text-sm rounded-lg"
+              style={{ background: "transparent", border: `1px solid ${BORDER}`, color: MUTED }}>
               Cancel
             </Button>
           </div>
@@ -314,66 +205,70 @@ function ProductionLogForm() {
   );
 }
 
-// ── Production sheet view ─────────────────────────────────────────────────────
+// ── Production view (SNS style) ───────────────────────────────────────────────
 
 function ProductionView({ p, repName, countdown }: { p: RepProductionStats; repName: string; countdown: number }) {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+    <div className="p-6 space-y-6 max-w-4xl mx-auto" style={{ background: BG }}>
+
+      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#dce8f4" }}>{repName}'s Dashboard</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>Personal production · this month · refreshing in {countdown}s</p>
+          <h1 className="text-xl font-bold" style={{ color: TEXT }}>{repName}</h1>
+          <p className="text-sm mt-0.5" style={{ color: MUTED }}>{today}</p>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
-          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+          style={{ background: `${GREEN}18`, color: GREEN, border: `1px solid ${GREEN}30` }}>
+          <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: GREEN }} />
           Live · refreshing in {countdown}s
         </div>
       </div>
 
-      <div className="space-y-3">
-        <SectionHeader title="Calls & activity" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <MetricTile label="Calls Made" value={String(p.callsMade)} gold icon={Target} />
-          <MetricTile label="Call Connects" value={String(p.callConnects)} icon={Users} />
-          <MetricTile label="Appt Sets" value={String(p.appointmentSets)} icon={TrendingUp} />
-          <MetricTile label="DMs Sent" value={String(p.dms)} icon={Users} />
+      {/* Activity */}
+      <div className="space-y-2">
+        <Section title="Activity" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricCard label="Calls Made"    value={p.callsMade}       icon={Phone}        accent="orange" />
+          <MetricCard label="Call Connects" value={p.callConnects}    icon={Phone} />
+          <MetricCard label="Appt Sets"     value={p.appointmentSets} icon={Calendar} />
+          <MetricCard label="DMs Sent"      value={p.dms}             icon={MessageSquare} />
         </div>
       </div>
 
-      <div className="space-y-3">
-        <SectionHeader title="Demos & sales" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <MetricTile label="Demos Showed" value={String(p.demosShowed)} icon={Users} />
-          <MetricTile label="No Shows" value={String(p.noShows)} red icon={AlertTriangle} />
-          <MetricTile label="Show Rate" value={`${p.showRate}%`} icon={TrendingUp} />
-          <MetricTile label="Sales" value={String(p.sales)} gold icon={Target} />
+      {/* Demos & Sales */}
+      <div className="space-y-2">
+        <Section title="Demos & Sales" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricCard label="Demos Showed" value={p.demosShowed} icon={Eye} accent="green" />
+          <MetricCard label="No Shows"     value={p.noShows}     icon={Eye}  accent="red" />
+          <MetricCard label="Show Rate"    value={`${p.showRate}%`}
+            icon={BarChart2}
+            accent={p.showRate >= 60 ? "green" : p.showRate >= 40 ? "orange" : "red"} />
+          <MetricCard label="Sales"        value={p.sales}       icon={TrendingUp} accent="orange" />
         </div>
       </div>
 
-      <div className="space-y-3">
-        <SectionHeader title="Revenue" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-          <MetricTile label="Collections" value={fmt$.format(p.collections)} gold icon={DollarSign} />
-          <MetricTile label="Commissions" value={fmt$.format(p.commissions)} icon={DollarSign} />
+      {/* Revenue */}
+      <div className="space-y-2">
+        <Section title="Revenue" />
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard label="Collections"  value={fmt$.format(p.collections)} icon={DollarSign} accent="green" />
+          <MetricCard label="Commissions"  value={fmt$.format(p.commissions)} icon={DollarSign} />
         </div>
       </div>
 
-      <div className="space-y-3">
-        <SectionHeader title="Daily calls · this month" />
-        <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 30)} color="#1D9E75"
-          formatter={v => String(v)} />
+      {/* Trend */}
+      <div className="space-y-2">
+        <Section title="Daily calls this month" />
+        <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 31)} color={ORANGE} />
       </div>
 
-      <div className="space-y-3">
-        <SectionHeader title="Submit numbers" />
+      {/* Log numbers */}
+      <div className="space-y-2">
+        <Section title="Log numbers" />
         <ProductionLogForm />
-      </div>
-
-      <div className="pb-2">
-        <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
-          Leadwell Advisors Analytics Platform &nbsp;·&nbsp; A Stack N Scale managed client
-        </p>
       </div>
     </div>
   );
@@ -399,94 +294,57 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
     return () => { clearInterval(refreshId); clearInterval(tickId); };
   }, [router]);
 
-  // Production sheet reps have appointmentSets field
+  // Production sheet reps
   if ("appointmentSets" in metrics) {
     return <ProductionView p={metrics as RepProductionStats} repName={repName} countdown={countdown} />;
   }
 
+  // Legacy setter/closer view
   const isSetter = role === "setter";
   const s = metrics as SetterStats;
   const c = metrics as CloserStats;
 
-  const rankOrdinal = (n: number) => {
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    return `#${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-  };
-
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
-      {/* Header */}
+    <div className="p-6 space-y-6 max-w-4xl mx-auto" style={{ background: BG }}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#dce8f4" }}>
-            {repName}'s Dashboard
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>
-            {isSetter ? "Setter" : "Closer"} · personal stats · refreshing in {countdown}s
-          </p>
+          <h1 className="text-xl font-bold" style={{ color: TEXT }}>{repName}</h1>
+          <p className="text-sm" style={{ color: MUTED }}>{isSetter ? "Setter" : "Closer"} · this month</p>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
-          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+          style={{ background: `${GREEN}18`, color: GREEN, border: `1px solid ${GREEN}30` }}>
+          <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: GREEN }} />
           Live · refreshing in {countdown}s
         </div>
       </div>
 
-      {/* Rank card */}
-      <div className="rounded-xl p-5" style={{ ...CARD, borderLeft: "3px solid rgba(74,122,181,0.6)" }}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-1" style={{ color: "#5a7a9a" }}>
-          Your Rank
-        </p>
-        <p className="text-4xl font-black tabular-nums" style={{ color: "#dce8f4" }}>
-          {isSetter ? rankOrdinal(s.rankAmongSetters) : rankOrdinal(c.rankAmongClosers)}
-        </p>
-        <p className="text-xs mt-1" style={{ color: "#4a6a8a" }}>
-          of {isSetter ? s.totalSetters : c.totalClosers} {isSetter ? "setters" : "closers"}
-        </p>
-      </div>
-
-      {/* Key metrics */}
-      <div className="space-y-3">
-        <SectionHeader title="Your numbers · this month" />
+      <div className="space-y-2">
+        <Section title="Your numbers" />
         {isSetter ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricTile label="Calls Booked" value={String(s.callsBooked)} gold icon={Target} />
-            <MetricTile label="Demos Showed" value={String(s.demosShowed)} icon={Users} />
-            <MetricTile label="No Shows" value={String(s.noShows)} red icon={AlertTriangle} />
-            <MetricTile label="Show Rate" value={`${s.showRate}%`} icon={TrendingUp} />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Calls Booked"  value={s.callsBooked}    accent="orange" icon={Phone} />
+            <MetricCard label="Demos Showed"  value={s.demosShowed}    accent="green"  icon={Eye} />
+            <MetricCard label="No Shows"      value={s.noShows}        accent="red"    icon={Eye} />
+            <MetricCard label="Show Rate"     value={`${s.showRate}%`} icon={BarChart2}
+              accent={s.showRate >= 60 ? "green" : s.showRate >= 40 ? "orange" : "red"} />
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricTile label="Cash Collected" value={fmt$.format(c.cashCollected)} gold icon={DollarSign} />
-            <MetricTile label="Deals Closed" value={String(c.dealsClosed)} icon={Target} />
-            <MetricTile label="Close Rate" value={`${c.closeRate}%`} icon={TrendingUp} />
-            <MetricTile label="Avg Deal Size" value={fmt$.format(c.avgDealSize)} icon={DollarSign} />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Cash Collected" value={fmt$.format(c.cashCollected)} accent="orange" icon={DollarSign} />
+            <MetricCard label="Deals Closed"   value={c.dealsClosed}               icon={TrendingUp} />
+            <MetricCard label="Close Rate"     value={`${c.closeRate}%`}
+              accent={c.closeRate >= 30 ? "green" : c.closeRate >= 15 ? "orange" : "red"} icon={BarChart2} />
+            <MetricCard label="Avg Deal Size"  value={fmt$.format(c.avgDealSize)}  icon={DollarSign} />
           </div>
         )}
       </div>
 
-      {/* Trend chart */}
-      <div className="space-y-3">
-        <SectionHeader title="Trend · last 6 weeks" />
-        {isSetter ? (
-          <TrendChart title="Calls Booked" data={s.bookingTrend} color="#1D9E75" />
-        ) : (
-          <TrendChart title="Cash Collected" data={c.cashTrend} color="#fcd34d"
-            formatter={v => `$${(v / 1000).toFixed(1)}k`} />
-        )}
-      </div>
-
-      {/* Log numbers */}
-      <div className="space-y-3">
-        <SectionHeader title="Submit numbers" />
-        <LogNumbersForm role={role} />
-      </div>
-
-      <div className="pb-2">
-        <p className="text-xs text-center" style={{ color: "#2a3f52" }}>
-          Leadwell Advisors Analytics Platform &nbsp;·&nbsp; A Stack N Scale managed client
-        </p>
+      <div className="space-y-2">
+        <Section title="Trend" />
+        {isSetter
+          ? <TrendChart title="Calls Booked" data={s.bookingTrend} color={ORANGE} />
+          : <TrendChart title="Cash Collected" data={c.cashTrend} color={GREEN} formatter={v => `$${(v/1000).toFixed(1)}k`} />
+        }
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -11,6 +11,7 @@ import {
   BarChart3,
   ChevronRight,
   Users,
+  LogOut,
 } from "lucide-react";
 
 interface NavItem {
@@ -18,8 +19,6 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   exact?: boolean;
-  adminOnly?: boolean;
-  staffOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -31,6 +30,7 @@ const navItems: NavItem[] = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   const NAVY_BORDER = "rgba(180,210,240,0.08)";
   const NAVY_ACTIVE_BG = "rgba(42,68,114,0.5)";
@@ -94,15 +94,43 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
+      {/* User + Sign out */}
+      <div className="p-3 space-y-2" style={{ borderTop: `1px solid ${NAVY_BORDER}` }}>
+        {/* Who's logged in */}
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
+          style={{ background: "rgba(255,255,255,0.03)" }}>
+          <div className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
+            style={{ background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)", color: "#a8bdd4" }}>
+            {session?.user?.email?.[0]?.toUpperCase() ?? "A"}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold truncate" style={{ color: "#c8daea" }}>
+              {session?.user?.email ?? "Admin"}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider" style={{ color: "#3a5a7a" }}>Administrator</p>
+          </div>
+        </div>
+
+        {/* Sign out */}
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors w-full text-left"
-          style={{ color: "#3a5a7a" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#7a9ab8"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#3a5a7a"; }}
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all w-full text-left"
+          style={{
+            color: "#7a9ab8",
+            border: "1px solid rgba(180,210,240,0.08)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "#f87171";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(248,113,113,0.25)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.06)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "#7a9ab8";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(180,210,240,0.08)";
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+          }}
         >
+          <LogOut className="h-4 w-4" />
           Sign out
         </button>
       </div>

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users, Plus, Trash2, RefreshCw, LinkIcon, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { Users, Plus, Trash2, RefreshCw, Eye, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -232,6 +233,14 @@ function StaffTable({ members, onDelete, onResetPw }: {
               </td>
               <td className="px-4 py-4">
                 <div className="flex items-center justify-end gap-1.5">
+                  <Link href={`/admin/staff-preview/${m.id}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                    style={{ color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(74,222,128,0.08)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ""; }}>
+                    <Eye className="h-3 w-3" />
+                    View
+                  </Link>
                   <button onClick={() => onResetPw(m.id, m.name)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                     style={{ color: "#7a9ab8", border: "1px solid rgba(180,210,240,0.1)" }}
