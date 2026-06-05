@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -42,6 +43,7 @@ export function DataEntrySection({ tenantId, initialCalls, initialLeads }: {
   initialCalls: Call[];
   initialLeads: Lead[];
 }) {
+  const router = useRouter();
   const [calls, setCalls] = useState<Call[]>(initialCalls);
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [tab, setTab] = useState<"calls" | "leads">("calls");
@@ -82,6 +84,7 @@ export function DataEntrySection({ tenantId, initialCalls, initialLeads }: {
       setCalls((prev) => [data.call, ...prev]);
       setCallForm((f) => ({ ...f, setter: "", closer: "", lead_name: "", outcome: "", cash_collected: "", contract_value: "" }));
       flash("Call added", true);
+      router.refresh();
     } finally { setSaving(false); }
   }, [tenantId, callForm]);
 
@@ -98,6 +101,7 @@ export function DataEntrySection({ tenantId, initialCalls, initialLeads }: {
       setLeads((prev) => [data.lead, ...prev]);
       setLeadForm((f) => ({ ...f, lead_name: "", source: "", setter: "", notes: "" }));
       flash("Lead added", true);
+      router.refresh();
     } finally { setSaving(false); }
   }, [tenantId, leadForm]);
 

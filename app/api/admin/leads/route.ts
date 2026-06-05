@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdminAuth } from "@/lib/api-auth";
 
 export async function GET(request: Request) {
@@ -57,5 +58,6 @@ export async function POST(request: Request) {
     after_data: JSON.parse(JSON.stringify(body)),
   });
 
+  revalidatePath("/clients/[tenant]", "page");
   return NextResponse.json({ ok: true, lead: data });
 }

@@ -11,6 +11,8 @@ import { DateRangeNav } from "@/components/dashboard/DateRangeNav";
 import { AccordionSection } from "@/components/ui/accordion-section";
 import { Suspense } from "react";
 
+export const dynamic = "force-dynamic";
+
 const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 function getMTDRange(): { from: Date; to: Date } {
@@ -104,7 +106,7 @@ async function DashboardContent({
   const leadList = leads ?? [];
   const hasData = callList.length > 0 || leadList.length > 0;
   const kpis = computeKPIs(callList, leadList, range);
-  const monthlyGoal = (tenant as any).monthly_goal ?? 10000;
+  const monthlyGoal = tenant.monthly_goal ?? 10000;
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px]">

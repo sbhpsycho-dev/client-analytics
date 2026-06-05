@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdminAuth } from "@/lib/api-auth";
 
 export async function DELETE(
@@ -15,5 +16,6 @@ export async function DELETE(
     .eq("id", id);
 
   if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+  revalidatePath("/clients/[tenant]", "page");
   return NextResponse.json({ ok: true });
 }

@@ -94,19 +94,24 @@ function TrendChart({ title, data, color }: { title: string; data: number[]; col
 // ── Today's Numbers form ──────────────────────────────────────────────────────
 
 function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate]             = useState(() => new Date().toISOString().slice(0, 10));
   const [callsMade, setCallsMade]   = useState("");
   const [dms, setDms]               = useState("");
   const [connects, setConnects]     = useState("");
   const [set, setSet]               = useState("");
   const [show, setShow]             = useState("");
+  const [introUnits, setIntroUnits] = useState("");
+  const [majorUnits, setMajorUnits] = useState("");
   const [sales, setSales]           = useState("");
   const [collections, setCollections] = useState("");
+  const [commissions, setCommissions] = useState("");
+  const [termsStatus, setTermsStatus] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function reset() {
     setCallsMade(""); setDms(""); setConnects("");
-    setSet(""); setShow(""); setSales(""); setCollections("");
+    setSet(""); setShow(""); setIntroUnits(""); setMajorUnits("");
+    setSales(""); setCollections(""); setCommissions(""); setTermsStatus("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -117,20 +122,24 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date,
-          callsMade:   Number(callsMade)                   || 0,
-          dms:         Number(dms)                         || 0,
-          connects:    Number(connects)                    || 0,
-          set:         Number(set)                         || 0,
-          show:        Number(show)                        || 0,
-          sales:       Number(sales)                       || 0,
+          callsMade:   Number(callsMade)                      || 0,
+          dms:         Number(dms)                            || 0,
+          connects:    Number(connects)                       || 0,
+          set:         Number(set)                            || 0,
+          show:        Number(show)                           || 0,
+          introUnits:  Number(introUnits)                     || 0,
+          majorUnits:  Number(majorUnits)                     || 0,
+          sales:       Number(sales)                          || 0,
           collections: Number(collections.replace(/[$,]/g, "")) || 0,
+          commissions: Number(commissions.replace(/[$,]/g, "")) || 0,
+          termsStatus: termsStatus.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Failed to submit"); return; }
       toast.success("Numbers logged — dashboard updating…");
       reset();
-      onSubmitted(); // switches to Pipeline tab + triggers router.refresh()
+      onSubmitted();
     });
   }
 
@@ -170,19 +179,43 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
 
         <div className="space-y-2">
           <SectionHeader title="Pipeline" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {([["Appointment Sets", set, setSet], ["Demos Showed", show, setShow], ["Deals Closed", sales, setSales]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {([
+              ["Appointment Sets", set,        setSet],
+              ["Demos Showed",     show,       setShow],
+              ["Intro Units",      introUnits, setIntroUnits],
+              ["Major Units",      majorUnits, setMajorUnits],
+              ["Deals Closed",     sales,      setSales],
+            ] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
               <div key={label} className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
                 <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
                   placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
               </div>
             ))}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Cash Collected ($)</label>
-              <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
-                placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <SectionHeader title="Revenue" />
+          <div className="grid grid-cols-2 gap-3">
+            {([["Cash Collected ($)", collections, setCollections], ["Commissions ($)", commissions, setCommissions]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+              <div key={label} className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+                <Input type="text" value={value} onChange={e => setter(e.target.value)}
+                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <SectionHeader title="Notes" />
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Terms / Status <span style={{ color: "#3a5a7a" }}>(optional)</span></label>
+            <Input type="text" value={termsStatus} onChange={e => setTermsStatus(e.target.value)}
+              placeholder="e.g. Paid In Full, Payment Plan…"
+              className="h-10 rounded-lg text-sm" style={inputStyle} />
           </div>
         </div>
 

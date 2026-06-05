@@ -78,8 +78,11 @@ export interface RepProductionStats {
   connects: number;     // col D — Call Connects
   set: number;          // col E — Appointment Sets
   show: number;         // col F — Demos Showed
+  introUnits: number;   // col G — Intro Units
+  majorUnits: number;   // col H — Major Units
   sales: number;        // col I — Sales (deals closed)
   collections: number;  // col J — Collections (cash)
+  commissions: number;  // col L — Overall Total Commissions
   showRate: number;     // show / set * 100
   closeRate: number;    // sales / show * 100
   callsTrend: number[]; // daily callsMade for current month
@@ -149,8 +152,11 @@ interface ProductionRow {
   connects: number;
   set: number;
   show: number;
+  introUnits: number;
+  majorUnits: number;
   sales: number;
   collections: number;
+  commissions: number;
 }
 
 function parseNum(v: string | undefined): number {
@@ -166,7 +172,7 @@ function parseProductionSheetRows(raw: string[][]): ProductionRow[] {
     const r = raw[i];
     const dayVal = (r[0] ?? "").toString().trim();
     const day = parseFloat(dayVal);
-    if (isNaN(day) || day < 1 || day > 31) continue; // skip totals/empty rows
+    if (isNaN(day) || day < 1 || day > 31) continue;
     rows.push({
       day,
       callsMade:   parseNum(r[1]),
@@ -174,8 +180,11 @@ function parseProductionSheetRows(raw: string[][]): ProductionRow[] {
       connects:    parseNum(r[3]),
       set:         parseNum(r[4]),
       show:        parseNum(r[5]),
+      introUnits:  parseNum(r[6]),
+      majorUnits:  parseNum(r[7]),
       sales:       parseNum(r[8]),
       collections: parseNum(r[9]),
+      commissions: parseNum(r[11]),
     });
   }
   return rows;
@@ -202,8 +211,11 @@ function computeRepProductionStats(
     connects:    sum("connects"),
     set,
     show,
+    introUnits:  sum("introUnits"),
+    majorUnits:  sum("majorUnits"),
     sales,
     collections: sum("collections"),
+    commissions: sum("commissions"),
     showRate:    set   > 0 ? Math.round((show  / set)   * 100) : 0,
     closeRate:   show  > 0 ? Math.round((sales / show)  * 100) : 0,
     callsTrend,
@@ -677,7 +689,8 @@ function emptyRepStats(name: string, sheetId: string): RepProductionStats {
   return {
     name, sheetId,
     callsMade: 0, dms: 0, connects: 0,
-    set: 0, show: 0, sales: 0, collections: 0,
+    set: 0, show: 0, introUnits: 0, majorUnits: 0,
+    sales: 0, collections: 0, commissions: 0,
     showRate: 0, closeRate: 0,
     callsTrend: [],
   };
