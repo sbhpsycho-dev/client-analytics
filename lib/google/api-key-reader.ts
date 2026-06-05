@@ -52,7 +52,7 @@ export async function sheetGet(
     const headers = await authHeaders();
     const res = await fetch(url, {
       headers: headers ?? {},
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const json = await res.json();
@@ -76,7 +76,7 @@ export async function sheetMeta(spreadsheetId: string): Promise<string[]> {
     const headers = await authHeaders();
     const res = await fetch(url, {
       headers: headers ?? {},
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const json = await res.json();

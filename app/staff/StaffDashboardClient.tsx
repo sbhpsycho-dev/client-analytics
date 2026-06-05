@@ -93,7 +93,7 @@ function TrendChart({ title, data, color }: { title: string; data: number[]; col
 
 // ── Today's Numbers form ──────────────────────────────────────────────────────
 
-function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
+function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [callsMade, setCallsMade]   = useState("");
   const [dms, setDms]               = useState("");
@@ -128,9 +128,9 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Failed to submit"); return; }
-      toast.success("Numbers logged to your sheet");
+      toast.success("Numbers logged — dashboard updating…");
       reset();
-      onSubmitted();
+      onSubmitted(); // switches to Pipeline tab + triggers router.refresh()
     });
   }
 
@@ -412,7 +412,7 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
           <LegacyView metrics={metrics as SetterStats | CloserStats} role={role} countdown={countdown} />
         )}
         {tab === "today" && (
-          <TodayForm onSubmitted={() => setTab("pipeline")} />
+          <TodayForm onSubmitted={() => { setTab("pipeline"); router.refresh(); }} />
         )}
       </div>
     </div>

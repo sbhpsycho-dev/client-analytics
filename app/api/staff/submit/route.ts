@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { sheetsAppend } from "@/lib/google/sheets";
@@ -69,6 +70,9 @@ export async function POST(req: Request) {
 
   try {
     await sheetsAppend(accessToken, sheetId, `${tabName}!A:L`, [row]);
+    // Bust the Next.js cache so both dashboards show fresh data immediately
+    revalidatePath("/staff");
+    revalidatePath("/admin");
     return NextResponse.json({ success: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
