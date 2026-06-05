@@ -158,7 +158,7 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
         <div className="space-y-2">
           <SectionHeader title="Calls" />
           <div className="grid grid-cols-3 gap-3">
-            {([["Calls Made", callsMade, setCallsMade], ["DMs", dms, setDms], ["Call Connects", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+            {([["Calls Made", callsMade, setCallsMade], ["DMs Sent", dms, setDms], ["Calls Answered", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
               <div key={label} className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
                 <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
@@ -171,7 +171,7 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
         <div className="space-y-2">
           <SectionHeader title="Pipeline" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {([["Appt Sets", set, setSet], ["Demos Showed", show, setShow], ["Sales", sales, setSales]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+            {([["Appointment Sets", set, setSet], ["Demos Showed", show, setShow], ["Deals Closed", sales, setSales]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
               <div key={label} className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
                 <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
@@ -179,7 +179,7 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void }) {
               </div>
             ))}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Collections ($)</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Cash Collected ($)</label>
               <Input type="text" value={collections} onChange={e => setCollections(e.target.value)}
                 placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
             </div>
@@ -239,8 +239,8 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
         <SectionHeader title="Calls" />
         <div className="grid grid-cols-3 gap-3">
           <MetricTile label="Calls Made"    value={String(p.callsMade)} gold icon={Phone} />
-          <MetricTile label="DMs"           value={String(p.dms)}       icon={MessageSquare} />
-          <MetricTile label="Call Connects" value={String(p.connects)}  icon={Phone} />
+          <MetricTile label="DMs Sent"      value={String(p.dms)}       icon={MessageSquare} />
+          <MetricTile label="Calls Answered" value={String(p.connects)}  icon={Phone} />
         </div>
       </div>
 
@@ -248,10 +248,10 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
       <div className="space-y-3">
         <SectionHeader title="Pipeline" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricTile label="Appt Sets"    value={String(p.set)}                   icon={Calendar} />
-          <MetricTile label="Show Rate"    value={`${p.show} · ${p.showRate}%`}    icon={Eye} />
-          <MetricTile label="Sales"        value={String(p.sales)}                 gold icon={Target} />
-          <MetricTile label="Close Rate"   value={`${p.closeRate}%`}               icon={TrendingUp} />
+          <MetricTile label="Appointment Sets" value={String(p.set)}                   icon={Calendar} />
+          <MetricTile label="Demos Showed"  value={`${p.show} · ${p.showRate}%`}    icon={Eye} />
+          <MetricTile label="Deals Closed"  value={String(p.sales)}                 gold icon={Target} />
+          <MetricTile label="Close Rate"    value={`${p.closeRate}%`}               icon={TrendingUp} />
         </div>
       </div>
 
