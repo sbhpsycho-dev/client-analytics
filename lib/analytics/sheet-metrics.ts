@@ -80,50 +80,34 @@ export interface SheetMetrics {
   lastFetched: string;
 }
 
-// ── Mock fallback data ────────────────────────────────────────────────────────
+// ── Empty fallback (shown when no sheets are connected) ───────────────────────
 
 const MOCK_DASHBOARD: DashboardMetrics = {
-  cashCollectedMTD:    73_200,
-  netRevenueMTD:       68_400,
-  leadsThisMonth:      214,
-  totalDealsClosed:    11,
-  costPerClose:        850,
-  mrr:                 41_200,
-  cashCollectedYTD:   312_800,
-  totalRefundMTD:      4_800,
-  avgLeadResponseTime: "4m 32s",
-  cashTrend: [52_000, 54_600, 61_000, 65_100, 70_400, 73_200],
-  mrrTrend:  [36_400, 37_800, 39_100, 40_200, 40_800, 41_200],
+  cashCollectedMTD:    0,
+  netRevenueMTD:       0,
+  leadsThisMonth:      0,
+  totalDealsClosed:    0,
+  costPerClose:        0,
+  mrr:                 0,
+  cashCollectedYTD:    0,
+  totalRefundMTD:      0,
+  avgLeadResponseTime: "—",
+  cashTrend: [0, 0, 0, 0, 0, 0],
+  mrrTrend:  [0, 0, 0, 0, 0, 0],
   deltas: {
-    cashCollectedMTD: 8.5, netRevenueMTD: 7.9, leadsThisMonth: 12,
-    totalDealsClosed: 2, costPerClose: -5.2, mrr: 3.8,
-    cashCollectedYTD: 22.1, totalRefundMTD: 1.4,
+    cashCollectedMTD: 0, netRevenueMTD: 0, leadsThisMonth: 0,
+    totalDealsClosed: 0, costPerClose: 0, mrr: 0,
+    cashCollectedYTD: 0, totalRefundMTD: 0,
   },
 };
 
-const MOCK_PIPELINE: PipelineRep[] = [
-  { name: "Sylis",   color: "#1D9E75", callsMade: 210, callsAnswered: 147, demosSet: 52, demosShowed: 38, pitched: 35, closed: 11 },
-  { name: "Izaiah",  color: "#D8843A", callsMade: 185, callsAnswered: 120, demosSet: 44, demosShowed: 30, pitched: 27, closed:  9 },
-  { name: "Celest",  color: "#D957A8", callsMade: 162, callsAnswered: 108, demosSet: 39, demosShowed: 27, pitched: 24, closed:  7 },
-  { name: "Harneet", color: "#3B6FB5", callsMade:  95, callsAnswered:  68, demosSet: 28, demosShowed: 22, pitched: 20, closed:  8 },
-];
+const MOCK_PIPELINE: PipelineRep[] = [];
 
-const MOCK_LEADERBOARD: LeaderboardRep[] = [
-  { name: "Sylis",   color: "#1D9E75", cashCollected: 27_400, dealsClosed: 4, callsMade: 210, closeRate: 31, avgDealSize: 6_850 },
-  { name: "Izaiah",  color: "#D8843A", cashCollected: 25_800, dealsClosed: 4, callsMade: 185, closeRate: 33, avgDealSize: 6_450 },
-  { name: "Celest",  color: "#D957A8", cashCollected: 20_000, dealsClosed: 3, callsMade: 162, closeRate: 29, avgDealSize: 6_667 },
-  { name: "Harneet", color: "#3B6FB5", cashCollected: 19_400, dealsClosed: 2, callsMade:  95, closeRate: 40, avgDealSize: 9_700 },
-];
+const MOCK_LEADERBOARD: LeaderboardRep[] = [];
 
-const MOCK_SETTER_STATS: SetterStats[] = [
-  { name: "Sylis",  callsBooked: 52, demosShowed: 38, noShows: 14, showRate: 73, rankAmongSetters: 1, totalSetters: 2, bookingTrend: [8,9,10,8,9,8] },
-  { name: "Celest", callsBooked: 39, demosShowed: 27, noShows: 12, showRate: 69, rankAmongSetters: 2, totalSetters: 2, bookingTrend: [6,7,6,7,6,7] },
-];
+const MOCK_SETTER_STATS: SetterStats[] = [];
 
-const MOCK_CLOSER_STATS: CloserStats[] = [
-  { name: "Izaiah",  cashCollected: 25_800, dealsClosed: 4, closeRate: 33, avgDealSize: 6_450, rankAmongClosers: 1, totalClosers: 2, cashTrend: [4000,5000,5500,5800,5000,6500] },
-  { name: "Harneet", cashCollected: 19_400, dealsClosed: 2, closeRate: 40, avgDealSize: 9_700, rankAmongClosers: 2, totalClosers: 2, cashTrend: [2000,3000,3500,4000,3200,3700] },
-];
+const MOCK_CLOSER_STATS: CloserStats[] = [];
 
 // ── Column detection ──────────────────────────────────────────────────────────
 
