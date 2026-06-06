@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -24,5 +25,6 @@ export async function POST(
   if (!conn) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const result = await orchestrateSyncForTenant(conn.tenant_id);
+  if (result.ok) revalidatePath("/clients/[tenant]", "page");
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }
