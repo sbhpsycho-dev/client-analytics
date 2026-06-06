@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/service";
 import { sheetsAppend } from "@/lib/google/sheets";
 import { getServiceAccountToken } from "@/lib/google/service-account";
 import { sheetMeta } from "@/lib/google/api-key-reader";
@@ -15,67 +16,103 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { sheetId, name } = session.user;
-  if (!sheetId) {
-    return NextResponse.json(
-      { error: "No sheet linked to your account. Ask your admin to add your sheet URL in the Staff roster." },
-      { status: 400 }
-    );
+  const { staffId, sheetId, name } = session.user;
+  if (!staffId) {
+    return NextResponse.json({ error: "Staff account ID missing from session. Please log out and back in." }, { status: 400 });
   }
 
   const body = await req.json();
-  const { date, callsMade = 0, dms = 0, connects = 0, set = 0, show = 0, sales = 0, collections = 0 } = body;
+  const {
+    date,
+    callsMade   = 0,
+    dms         = 0,
+    connects    = 0,
+    set         = 0,
+    show        = 0,
+    introUnits  = 0,
+    majorUnits  = 0,
+    sales       = 0,
+    collections = 0,
+    commissions = 0,
+    termsStatus = "",
+  } = body;
+
   if (!date) return NextResponse.json({ error: "Date is required" }, { status: 400 });
 
-  // Day number for col A (Day of Month)
-  const day = new Date(date).getDate();
+  const service = createServiceClient();
 
-  // Row matches actual sheet column order:
-  // A: Day of Month | B: Calls Made | C: DMs | D: Call Connects | E: Appointment Sets
-  // F: Demos Showed | G: Intro Units (blank) | H: Major Units (blank)
-  // I: Sales | J: Collections | K: Terms/Status (blank) | L: Overall Total Commissions (blank)
-  const row = [
-    String(day),
-    String(callsMade),
-    String(dms),
-    String(connects),
-    String(set),
-    String(show),
-    "",   // G: Intro Units
-    "",   // H: Major Units
-    String(sales),
-    String(collections),
-    "",   // K: Terms/Status
-    "",   // L: Commissions (formula)
-  ];
+  // ── 1. Write to Supabase (source of truth) ──────────────────────────────────
+  const { data: entry, error: dbErr } = await service
+    .from("daily_numbers")
+    .upsert(
+      {
+        staff_id:     staffId,
+        date,
+        calls_made:   Number(callsMade),
+        dms:          Number(dms),
+        connects:     Number(connects),
+        sets:         Number(set),
+        shows:        Number(show),
+        intro_units:  Number(introUnits),
+        major_units:  Number(majorUnits),
+        sales:        Number(sales),
+        collections:  Number(String(collections).replace(/[$,]/g, "")),
+        commissions:  Number(String(commissions).replace(/[$,]/g, "")),
+        terms_status: String(termsStatus).trim(),
+        sheets_synced: false,
+        updated_at:   new Date().toISOString(),
+      },
+      { onConflict: "staff_id,date" }
+    )
+    .select("id")
+    .single();
 
-  const accessToken = await getServiceAccountToken();
-  if (!accessToken) {
-    return NextResponse.json(
-      { error: "Google credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_REFRESH_TOKEN." },
-      { status: 500 }
-    );
+  if (dbErr || !entry) {
+    console.error("[staff/submit] Supabase write failed:", dbErr);
+    return NextResponse.json({ error: "Failed to save your numbers. Please try again." }, { status: 500 });
   }
 
-  // Find the actual tab name (case-insensitive match for current month)
-  const targetMonth = MONTHS[new Date().getMonth()];
-  let tabName = targetMonth;
-  try {
-    const tabs = await sheetMeta(sheetId);
-    const match = tabs.find(t => t.toUpperCase().trim() === targetMonth);
-    if (match) tabName = match;
-  } catch {
-    // Fall through with default
+  // Bust cache immediately — dashboards read from Supabase so this is instant
+  revalidatePath("/staff");
+  revalidatePath("/admin");
+
+  // ── 2. Mirror to Google Sheets (non-blocking) ───────────────────────────────
+  if (sheetId) {
+    const day = new Date(date).getDate();
+    const row = [
+      String(day),
+      String(callsMade),
+      String(dms),
+      String(connects),
+      String(set),
+      String(show),
+      String(introUnits),
+      String(majorUnits),
+      String(sales),
+      String(collections).replace(/[$,]/g, ""),
+      String(termsStatus).trim(),
+      String(commissions).replace(/[$,]/g, ""),
+    ];
+
+    (async () => {
+      try {
+        const accessToken = await getServiceAccountToken();
+        if (!accessToken) return;
+        const targetMonth = MONTHS[new Date().getMonth()];
+        let tabName = targetMonth;
+        try {
+          const tabs = await sheetMeta(sheetId);
+          const match = tabs.find(t => t.toUpperCase().trim() === targetMonth);
+          if (match) tabName = match;
+        } catch { /* use default */ }
+        await sheetsAppend(accessToken, sheetId, `${tabName}!A:L`, [row]);
+        await service.from("daily_numbers").update({ sheets_synced: true }).eq("id", entry.id);
+      } catch (err) {
+        console.error("[staff/submit] Sheets mirror failed (data saved in Supabase):", err);
+        // sheets_synced stays false — will be retried next sync
+      }
+    })();
   }
 
-  try {
-    await sheetsAppend(accessToken, sheetId, `${tabName}!A:L`, [row]);
-    // Bust the Next.js cache so both dashboards show fresh data immediately
-    revalidatePath("/staff");
-    revalidatePath("/admin");
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: `Failed to write to sheet: ${msg}` }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, entryId: entry.id });
 }

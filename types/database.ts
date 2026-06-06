@@ -3,6 +3,66 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      daily_numbers: {
+        Row: {
+          id: string;
+          staff_id: string;
+          date: string;
+          calls_made: number;
+          dms: number;
+          connects: number;
+          sets: number;
+          shows: number;
+          intro_units: number;
+          major_units: number;
+          sales: number;
+          collections: number;
+          commissions: number;
+          terms_status: string;
+          sheets_synced: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          staff_id: string;
+          date: string;
+          calls_made?: number;
+          dms?: number;
+          connects?: number;
+          sets?: number;
+          shows?: number;
+          intro_units?: number;
+          major_units?: number;
+          sales?: number;
+          collections?: number;
+          commissions?: number;
+          terms_status?: string;
+          sheets_synced?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          staff_id?: string;
+          date?: string;
+          calls_made?: number;
+          dms?: number;
+          connects?: number;
+          sets?: number;
+          shows?: number;
+          intro_units?: number;
+          major_units?: number;
+          sales?: number;
+          collections?: number;
+          commissions?: number;
+          terms_status?: string;
+          sheets_synced?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: never[];
+      };
       staff_accounts: {
         Row: {
           id: string;

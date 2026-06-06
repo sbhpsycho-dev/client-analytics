@@ -8,6 +8,7 @@ declare module "next-auth" {
       staffRole?: "setter" | "closer";
       sheetId?: string;
       sheetTab?: string;
+      staffId?: string;
     } & DefaultSession["user"];
   }
   interface User {
@@ -16,6 +17,7 @@ declare module "next-auth" {
     staffRole?: "setter" | "closer";
     sheetId?: string;
     sheetTab?: string;
+    staffId?: string;
   }
 }
 
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     staffRole?: "setter" | "closer";
     sheetId?: string;
     sheetTab?: string;
+    staffId?: string;
   }
 }

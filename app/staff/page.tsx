@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { getStaffMetrics } from "@/lib/analytics/sheet-metrics";
+import { getRepProductionStats, getRepDailyNumbers } from "@/lib/analytics/daily-numbers";
 import { StaffDashboardClient } from "./StaffDashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -11,16 +11,18 @@ export default async function StaffPage() {
 
   if (!session?.user?.isStaff) redirect("/login");
 
-  const { name, staffRole, sheetId, sheetTab } = session.user;
+  const { name, staffRole, staffId } = session.user;
+  if (!staffRole || !name || !staffId) redirect("/login");
 
-  if (!staffRole || !name) redirect("/login");
-
-  const metrics = await getStaffMetrics(name, staffRole, sheetId, sheetTab);
+  const [prodStats, history] = await Promise.all([
+    getRepProductionStats(staffId, name),
+    getRepDailyNumbers(staffId),
+  ]);
 
   return (
     <StaffDashboardClient
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      metrics={metrics as any}
+      prodStats={prodStats}
+      history={history}
       role={staffRole}
       repName={name}
     />

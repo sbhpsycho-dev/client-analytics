@@ -134,6 +134,10 @@ export const authOptions: NextAuthOptions = {
         token.staffRole = (user as { staffRole?: "setter" | "closer" }).staffRole;
         token.sheetId   = (user as { sheetId?: string }).sheetId;
         token.sheetTab  = (user as { sheetTab?: string }).sheetTab;
+        // staff_accounts.id — needed to write daily_numbers rows
+        if ((user as { isStaff?: boolean }).isStaff) {
+          token.staffId = user.id;
+        }
       }
       return token;
     },
@@ -143,6 +147,7 @@ export const authOptions: NextAuthOptions = {
       session.user.staffRole = token.staffRole;
       session.user.sheetId   = token.sheetId;
       session.user.sheetTab  = token.sheetTab;
+      session.user.staffId   = token.staffId;
       return session;
     },
   },

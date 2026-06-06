@@ -41,7 +41,7 @@ export async function sheetGet(
   spreadsheetId: string,
   range: string
 ): Promise<string[][]> {
-  const hasAuth = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SHEETS_API_KEY;
+  const hasAuth = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_REFRESH_TOKEN;
   if (!hasAuth) return [];
 
   const url = buildUrl(
@@ -64,7 +64,7 @@ export async function sheetGet(
 
 // Auth-aware sheet tab list fetch
 export async function sheetMeta(spreadsheetId: string): Promise<string[]> {
-  const hasAuth = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SHEETS_API_KEY;
+  const hasAuth = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_REFRESH_TOKEN;
   if (!hasAuth) return [];
 
   const url = buildUrl(

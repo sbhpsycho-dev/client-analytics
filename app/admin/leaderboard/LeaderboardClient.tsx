@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 
 const REFRESH_INTERVAL = 45_000;
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
@@ -221,11 +222,23 @@ interface Props {
 export function LeaderboardClient({ reps, live, lastFetched }: Props) {
   const router = useRouter();
   const [category, setCategory] = useState<Category>("cashCollected");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => router.refresh(), REFRESH_INTERVAL);
     return () => clearInterval(id);
   }, [router]);
+
+  async function handleReset() {
+    if (!window.confirm("Reset all current-month data to zero? This cannot be undone.")) return;
+    setResetting(true);
+    try {
+      await fetch("/api/admin/reset-month", { method: "POST" });
+      router.refresh();
+    } finally {
+      setResetting(false);
+    }
+  }
 
   const ranked = [...reps].sort((a, b) => b[category] - a[category]);
 
@@ -242,7 +255,23 @@ export function LeaderboardClient({ reps, live, lastFetched }: Props) {
             {reps.length} reps · ranked by selected category
           </p>
         </div>
-        <StatusBadge live={live} lastFetched={lastFetched} />
+        <div className="flex items-center gap-3">
+          <StatusBadge live={live} lastFetched={lastFetched} />
+          <button
+            onClick={handleReset}
+            disabled={resetting}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all"
+            style={{
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.25)",
+              color: resetting ? "#7a3a3a" : "#f87171",
+              cursor: resetting ? "not-allowed" : "pointer",
+            }}
+          >
+            <RotateCcw className="h-3 w-3" />
+            {resetting ? "Resetting…" : "Reset Month"}
+          </button>
+        </div>
       </div>
 
       {/* Headline */}

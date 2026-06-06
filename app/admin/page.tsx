@@ -1,15 +1,15 @@
-import { getSheetMetrics } from "@/lib/analytics/sheet-metrics";
+import { getAdminDashboardStats } from "@/lib/analytics/daily-numbers";
 import { DashboardClient } from "./DashboardClient";
 
-export const revalidate = 30; // re-fetch sheet data every 5 minutes
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const metrics = await getSheetMetrics();
+  const { dashboard, live, lastFetched } = await getAdminDashboardStats();
   return (
     <DashboardClient
-      metrics={metrics.dashboard}
-      live={metrics.live}
-      lastFetched={metrics.lastFetched}
+      metrics={dashboard}
+      live={live}
+      lastFetched={lastFetched}
     />
   );
 }

@@ -8,16 +8,17 @@ import {
 } from "recharts";
 import {
   BarChart2, ClipboardList,
-  DollarSign, Target, TrendingUp, Users, AlertTriangle,
-  Phone, MessageSquare, Calendar, Eye, BarChart3,
+  DollarSign, Target, TrendingUp, Users,
+  Phone, MessageSquare, Calendar, Eye, CheckCircle, Clock,
 } from "lucide-react";
-import type { SetterStats, CloserStats, RepProductionStats } from "@/lib/analytics/sheet-metrics";
+import type { RepProductionStats } from "@/lib/analytics/sheet-metrics";
+import type { DailyNumberRow } from "@/lib/analytics/daily-numbers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const REFRESH_INTERVAL = 45_000;
 
-// ── Admin-matched styles ──────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const CARD: React.CSSProperties = {
   background: "linear-gradient(135deg, rgba(17,27,46,0.95) 0%, rgba(11,19,34,0.98) 100%)",
@@ -37,10 +38,16 @@ const CHART_TOOLTIP = {
 };
 
 const NAVY_BORDER = "rgba(180,210,240,0.08)";
-const NAVY_ACTIVE  = "rgba(42,68,114,0.5)";
-const NAVY_HOVER   = "rgba(42,68,114,0.25)";
+const NAVY_ACTIVE = "rgba(42,68,114,0.5)";
+const NAVY_HOVER  = "rgba(42,68,114,0.25)";
 
 const fmt$ = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+const inputStyle: React.CSSProperties = {
+  background: "rgba(13,24,40,0.8)",
+  border: "1px solid rgba(180,210,240,0.12)",
+  color: "#dce8f4",
+};
 
 // ── Primitives ────────────────────────────────────────────────────────────────
 
@@ -91,22 +98,25 @@ function TrendChart({ title, data, color }: { title: string; data: number[]; col
   );
 }
 
-// ── Today's Numbers form ──────────────────────────────────────────────────────
+// ── Entry form ────────────────────────────────────────────────────────────────
 
-function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
+function EntryForm({ onSubmitted, defaults }: {
+  onSubmitted: () => void;
+  defaults?: DailyNumberRow | null;
+}) {
   const [date, setDate]             = useState(() => new Date().toISOString().slice(0, 10));
-  const [callsMade, setCallsMade]   = useState("");
-  const [dms, setDms]               = useState("");
-  const [connects, setConnects]     = useState("");
-  const [set, setSet]               = useState("");
-  const [show, setShow]             = useState("");
-  const [introUnits, setIntroUnits] = useState("");
-  const [majorUnits, setMajorUnits] = useState("");
-  const [sales, setSales]           = useState("");
-  const [collections, setCollections] = useState("");
-  const [commissions, setCommissions] = useState("");
-  const [termsStatus, setTermsStatus] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [callsMade, setCallsMade]   = useState(defaults ? String(defaults.calls_made) : "");
+  const [dms, setDms]               = useState(defaults ? String(defaults.dms) : "");
+  const [connects, setConnects]     = useState(defaults ? String(defaults.connects) : "");
+  const [set, setSet]               = useState(defaults ? String(defaults.sets) : "");
+  const [show, setShow]             = useState(defaults ? String(defaults.shows) : "");
+  const [introUnits, setIntroUnits] = useState(defaults ? String(defaults.intro_units) : "");
+  const [majorUnits, setMajorUnits] = useState(defaults ? String(defaults.major_units) : "");
+  const [sales, setSales]           = useState(defaults ? String(defaults.sales) : "");
+  const [collections, setCollections] = useState(defaults ? String(defaults.collections) : "");
+  const [commissions, setCommissions] = useState(defaults ? String(defaults.commissions) : "");
+  const [termsStatus, setTermsStatus] = useState(defaults?.terms_status ?? "");
+  const [isPending, startTransition]  = useTransition();
 
   function reset() {
     setCallsMade(""); setDms(""); setConnects("");
@@ -122,14 +132,14 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date,
-          callsMade:   Number(callsMade)                      || 0,
-          dms:         Number(dms)                            || 0,
-          connects:    Number(connects)                       || 0,
-          set:         Number(set)                            || 0,
-          show:        Number(show)                           || 0,
-          introUnits:  Number(introUnits)                     || 0,
-          majorUnits:  Number(majorUnits)                     || 0,
-          sales:       Number(sales)                          || 0,
+          callsMade:   Number(callsMade)                         || 0,
+          dms:         Number(dms)                               || 0,
+          connects:    Number(connects)                          || 0,
+          set:         Number(set)                               || 0,
+          show:        Number(show)                              || 0,
+          introUnits:  Number(introUnits)                        || 0,
+          majorUnits:  Number(majorUnits)                        || 0,
+          sales:       Number(sales)                             || 0,
           collections: Number(collections.replace(/[$,]/g, "")) || 0,
           commissions: Number(commissions.replace(/[$,]/g, "")) || 0,
           termsStatus: termsStatus.trim(),
@@ -137,109 +147,178 @@ function TodayForm({ onSubmitted }: { onSubmitted: () => void; }) {
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Failed to submit"); return; }
-      toast.success("Numbers logged — dashboard updating…");
+      toast.success("Numbers saved!");
       reset();
       onSubmitted();
     });
   }
 
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const inputStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(180,210,240,0.12)",
-    color: "#dce8f4",
-  };
-
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto w-full">
-      <div>
-        <h2 className="text-lg font-bold" style={{ color: "#dce8f4" }}>Log Today's Numbers</h2>
-        <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>{today}</p>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <SectionHeader title="Date" />
+        <input type="date" className="w-full rounded-lg border px-3 py-2 text-sm h-10"
+          style={{ ...inputStyle, borderColor: "rgba(180,210,240,0.12)" }}
+          value={date} onChange={e => setDate(e.target.value)} required />
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Date</label>
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)}
-            required className="h-10 rounded-lg text-sm max-w-xs" style={inputStyle} />
+      <div className="space-y-2">
+        <SectionHeader title="Calls" />
+        <div className="grid grid-cols-3 gap-3">
+          {([["Calls Made", callsMade, setCallsMade], ["DMs Sent", dms, setDms], ["Calls Answered", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+            <div key={label} className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+              <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
+                placeholder="0" className="h-10 rounded-lg text-sm" style={inputStyle} />
+            </div>
+          ))}
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <SectionHeader title="Calls" />
-          <div className="grid grid-cols-3 gap-3">
-            {([["Calls Made", callsMade, setCallsMade], ["DMs Sent", dms, setDms], ["Calls Answered", connects, setConnects]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
-              <div key={label} className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
-                <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
+      <div className="space-y-2">
+        <SectionHeader title="Pipeline" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {([
+            ["Appointment Sets", set,        setSet],
+            ["Demos Showed",     show,       setShow],
+            ["Intro Units",      introUnits, setIntroUnits],
+            ["Major Units",      majorUnits, setMajorUnits],
+            ["Deals Closed",     sales,      setSales],
+          ] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+            <div key={label} className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+              <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
+                placeholder="0" className="h-10 rounded-lg text-sm" style={inputStyle} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <SectionHeader title="Revenue" />
+        <div className="grid grid-cols-2 gap-3">
+          {([["Cash Collected ($)", collections, setCollections], ["Commissions ($)", commissions, setCommissions]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
+            <div key={label} className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
+              <Input type="text" value={value} onChange={e => setter(e.target.value)}
+                placeholder="0" className="h-10 rounded-lg text-sm" style={inputStyle} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <SectionHeader title="Notes" />
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+            Terms / Status <span style={{ color: "#3a5a7a" }}>(optional)</span>
+          </label>
+          <Input type="text" value={termsStatus} onChange={e => setTermsStatus(e.target.value)}
+            placeholder="e.g. Paid In Full, Payment Plan…"
+            className="h-10 rounded-lg text-sm" style={inputStyle} />
+        </div>
+      </div>
+
+      <Button type="submit" disabled={isPending}
+        className="w-full h-11 font-semibold rounded-xl text-sm"
+        style={{
+          background: "linear-gradient(135deg, #1e3a6e 0%, #2a4f8a 50%, #1e3f7a 100%)",
+          border: "1px solid rgba(180,210,240,0.18)",
+          color: "#dce8f4",
+          boxShadow: "0 4px 20px rgba(26,50,110,0.45)",
+        }}>
+        {isPending ? "Saving…" : "Save Numbers"}
+      </Button>
+    </form>
+  );
+}
+
+// ── History table ─────────────────────────────────────────────────────────────
+
+function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentMonth = today.slice(0, 7);
+  const mtd = rows.filter(r => r.date.startsWith(currentMonth));
+
+  const totals = mtd.reduce(
+    (acc, r) => ({
+      calls_made:  acc.calls_made  + r.calls_made,
+      sets:        acc.sets        + r.sets,
+      shows:       acc.shows       + r.shows,
+      sales:       acc.sales       + r.sales,
+      collections: acc.collections + r.collections,
+      commissions: acc.commissions + r.commissions,
+    }),
+    { calls_made: 0, sets: 0, shows: 0, sales: 0, collections: 0, commissions: 0 }
+  );
+
+  const TH = "text-[10px] font-bold uppercase tracking-wider py-2 px-3 text-left";
+  const TD = "py-2 px-3 text-sm tabular-nums";
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={CARD}>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(180,210,240,0.08)" }}>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Date</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Calls</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Sets</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Shows</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Closed</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Cash</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Comm.</th>
+              <th className={TH} style={{ color: "#4a6a8a" }}>Sync</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.id} style={{ borderBottom: "1px solid rgba(180,210,240,0.04)" }}>
+                <td className={TD} style={{ color: r.date === today ? "#fcd34d" : "#dce8f4", fontWeight: r.date === today ? 700 : 400 }}>
+                  {r.date === today ? "Today" : r.date.slice(5)}
+                </td>
+                <td className={TD} style={{ color: "#a8bdd4" }}>{r.calls_made}</td>
+                <td className={TD} style={{ color: "#a8bdd4" }}>{r.sets}</td>
+                <td className={TD} style={{ color: "#a8bdd4" }}>{r.shows}</td>
+                <td className={TD} style={{ color: r.sales > 0 ? "#4ade80" : "#a8bdd4" }}>{r.sales}</td>
+                <td className={TD} style={{ color: r.collections > 0 ? "#fcd34d" : "#a8bdd4" }}>{fmt$.format(r.collections)}</td>
+                <td className={TD} style={{ color: "#a8bdd4" }}>{fmt$.format(r.commissions)}</td>
+                <td className={TD}>
+                  {r.sheets_synced
+                    ? <CheckCircle className="h-3.5 w-3.5" style={{ color: "#4ade80" }} />
+                    : <Clock       className="h-3.5 w-3.5" style={{ color: "#7a9ab8" }} />}
+                </td>
+              </tr>
             ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <SectionHeader title="Pipeline" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {([
-              ["Appointment Sets", set,        setSet],
-              ["Demos Showed",     show,       setShow],
-              ["Intro Units",      introUnits, setIntroUnits],
-              ["Major Units",      majorUnits, setMajorUnits],
-              ["Deals Closed",     sales,      setSales],
-            ] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
-              <div key={label} className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
-                <Input type="number" min="0" value={value} onChange={e => setter(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <SectionHeader title="Revenue" />
-          <div className="grid grid-cols-2 gap-3">
-            {([["Cash Collected ($)", collections, setCollections], ["Commissions ($)", commissions, setCommissions]] as [string, string, (v: string) => void][]).map(([label, value, setter]) => (
-              <div key={label} className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</label>
-                <Input type="text" value={value} onChange={e => setter(e.target.value)}
-                  placeholder="0" required className="h-10 rounded-lg text-sm" style={inputStyle} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <SectionHeader title="Notes" />
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#4a6a8a" }}>Terms / Status <span style={{ color: "#3a5a7a" }}>(optional)</span></label>
-            <Input type="text" value={termsStatus} onChange={e => setTermsStatus(e.target.value)}
-              placeholder="e.g. Paid In Full, Payment Plan…"
-              className="h-10 rounded-lg text-sm" style={inputStyle} />
-          </div>
-        </div>
-
-        <Button type="submit" disabled={isPending}
-          className="w-full h-11 font-semibold rounded-xl text-sm"
-          style={{
-            background: "linear-gradient(135deg, #1e3a6e 0%, #2a4f8a 50%, #1e3f7a 100%)",
-            border: "1px solid rgba(180,210,240,0.18)",
-            color: "#dce8f4",
-            boxShadow: "0 4px 20px rgba(26,50,110,0.45)",
-          }}>
-          {isPending ? "Submitting…" : "Submit to Sheet"}
-        </Button>
-      </form>
+          </tbody>
+          {mtd.length > 0 && (
+            <tfoot>
+              <tr style={{ borderTop: "1px solid rgba(180,210,240,0.12)" }}>
+                <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>This Month</td>
+                <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>{totals.calls_made}</td>
+                <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>{totals.sets}</td>
+                <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>{totals.shows}</td>
+                <td className={TD} style={{ color: "#4ade80", fontWeight: 700 }}>{totals.sales}</td>
+                <td className={TD} style={{ color: "#fcd34d", fontWeight: 700 }}>{fmt$.format(totals.collections)}</td>
+                <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>{fmt$.format(totals.commissions)}</td>
+                <td className={TD} />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      {rows.length === 0 && (
+        <p className="text-sm text-center py-8" style={{ color: "#4a6a8a" }}>No entries yet — submit your first numbers above.</p>
+      )}
     </div>
   );
 }
 
-// ── Pipeline tab content ──────────────────────────────────────────────────────
+// ── Pipeline tab ──────────────────────────────────────────────────────────────
 
 function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: number }) {
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
-      {/* Live badge */}
       <div className="flex justify-end">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
           style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
@@ -248,7 +327,6 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
         </span>
       </div>
 
-      {/* Money generated — full-width gold card */}
       <div className="rounded-xl p-6" style={GOLD_CARD}>
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1"
           style={{ color: "rgba(252,211,77,0.6)" }}>Money Generated · This Month</p>
@@ -267,28 +345,25 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
         </div>
       </div>
 
-      {/* Calls */}
       <div className="space-y-3">
         <SectionHeader title="Calls" />
         <div className="grid grid-cols-3 gap-3">
-          <MetricTile label="Calls Made"    value={String(p.callsMade)} gold icon={Phone} />
-          <MetricTile label="DMs Sent"      value={String(p.dms)}       icon={MessageSquare} />
+          <MetricTile label="Calls Made"     value={String(p.callsMade)} gold icon={Phone} />
+          <MetricTile label="DMs Sent"       value={String(p.dms)}       icon={MessageSquare} />
           <MetricTile label="Calls Answered" value={String(p.connects)}  icon={Phone} />
         </div>
       </div>
 
-      {/* Pipeline */}
       <div className="space-y-3">
         <SectionHeader title="Pipeline" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricTile label="Appointment Sets" value={String(p.set)}                   icon={Calendar} />
-          <MetricTile label="Demos Showed"  value={`${p.show} · ${p.showRate}%`}    icon={Eye} />
-          <MetricTile label="Deals Closed"  value={String(p.sales)}                 gold icon={Target} />
-          <MetricTile label="Close Rate"    value={`${p.closeRate}%`}               icon={TrendingUp} />
+          <MetricTile label="Appointment Sets" value={String(p.set)}                icon={Calendar} />
+          <MetricTile label="Demos Showed"     value={`${p.show} · ${p.showRate}%`} icon={Eye} />
+          <MetricTile label="Deals Closed"     value={String(p.sales)}              gold icon={Target} />
+          <MetricTile label="Close Rate"       value={`${p.closeRate}%`}            icon={TrendingUp} />
         </div>
       </div>
 
-      {/* Trend */}
       <div className="space-y-3">
         <SectionHeader title="Daily calls made · this month" />
         <TrendChart title="Calls Made" data={p.callsTrend.slice(0, 31)} color="#4a7ab5" />
@@ -297,57 +372,41 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
   );
 }
 
-// ── Legacy view (setter/closer without production sheet) ──────────────────────
+// ── My Performance tab ────────────────────────────────────────────────────────
 
-function LegacyView({ metrics, role, countdown }: {
-  metrics: SetterStats | CloserStats; role: "setter" | "closer"; countdown: number;
-}) {
-  const isSetter = role === "setter";
-  const s = metrics as SetterStats;
-  const c = metrics as CloserStats;
+function PerformanceTab({ history, onSubmitted }: { history: DailyNumberRow[]; onSubmitted: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayEntry = history.find(r => r.date === today) ?? null;
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
-      <div className="flex justify-end">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full"
-          style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
-          Live · refreshing in {countdown}s
-        </span>
-      </div>
-      <div className="space-y-3">
-        <SectionHeader title="Your numbers · this month" />
-        {isSetter ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricTile label="Calls Booked" value={String(s.callsBooked)}   gold icon={Target} />
-            <MetricTile label="Demos Showed" value={String(s.demosShowed)}   icon={Users} />
-            <MetricTile label="No Shows"     value={String(s.noShows)}       red icon={AlertTriangle} />
-            <MetricTile label="Show Rate"    value={`${s.showRate}%`}        icon={TrendingUp} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricTile label="Cash Collected" value={fmt$.format(c.cashCollected)} gold icon={DollarSign} />
-            <MetricTile label="Deals Closed"   value={String(c.dealsClosed)}        icon={Target} />
-            <MetricTile label="Close Rate"     value={`${c.closeRate}%`}            icon={TrendingUp} />
-            <MetricTile label="Avg Deal Size"  value={fmt$.format(c.avgDealSize)}   icon={DollarSign} />
-          </div>
+      <div className="rounded-xl p-5 space-y-5" style={CARD}>
+        <p className="text-sm font-bold" style={{ color: "#dce8f4" }}>
+          {todayEntry ? "Update today's numbers" : "Log today's numbers"}
+        </p>
+        {todayEntry && (
+          <p className="text-xs -mt-3" style={{ color: "#4a6a8a" }}>
+            You already submitted for today — saving will overwrite your entry.
+          </p>
         )}
+        <EntryForm onSubmitted={onSubmitted} defaults={todayEntry} />
       </div>
-      {isSetter
-        ? <TrendChart title="Calls Booked" data={s.bookingTrend} color="#4a7ab5" />
-        : <TrendChart title="Cash Collected" data={c.cashTrend} color="#fcd34d" />
-      }
+
+      <div className="space-y-3">
+        <SectionHeader title="Entry History" />
+        <HistoryTable rows={history} />
+      </div>
     </div>
   );
 }
 
-// ── Sidebar navigation ────────────────────────────────────────────────────────
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
-type Tab = "pipeline" | "today";
+type Tab = "pipeline" | "performance";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "pipeline", label: "Pipeline",       icon: BarChart2 },
-  { id: "today",    label: "Today's Numbers", icon: ClipboardList },
+  { id: "pipeline",    label: "Pipeline",        icon: BarChart2 },
+  { id: "performance", label: "My Performance",  icon: ClipboardList },
 ];
 
 function StaffSidebar({ active, onChange, repName, role }: {
@@ -361,7 +420,6 @@ function StaffSidebar({ active, onChange, repName, role }: {
         background: "linear-gradient(180deg, #0f1d35 0%, #0d1828 100%)",
         borderRight: `1px solid ${NAVY_BORDER}`,
       }}>
-      {/* Rep identity */}
       <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: `1px solid ${NAVY_BORDER}` }}>
         <div className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0 text-sm font-bold"
           style={{ background: "linear-gradient(135deg, #1e3a6e, #2a4f8a)", color: "#a8bdd4" }}>
@@ -376,22 +434,15 @@ function StaffSidebar({ active, onChange, repName, role }: {
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5">
         {TABS.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
           return (
-            <button
-              key={id}
-              onClick={() => onChange(id)}
+            <button key={id} onClick={() => onChange(id)}
               className="relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all w-full text-left overflow-hidden"
-              style={{
-                color:           isActive ? "#dce8f4" : "#7a9ab8",
-                backgroundColor: isActive ? NAVY_ACTIVE : "transparent",
-              }}
+              style={{ color: isActive ? "#dce8f4" : "#7a9ab8", backgroundColor: isActive ? NAVY_ACTIVE : "transparent" }}
               onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = NAVY_HOVER; }}
-              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}
-            >
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}>
               {isActive && (
                 <span className="absolute left-0 inset-y-0 w-[3px] rounded-r my-1.5"
                   style={{ backgroundColor: "#4a7ab5" }} />
@@ -409,12 +460,13 @@ function StaffSidebar({ active, onChange, repName, role }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  metrics: SetterStats | CloserStats | RepProductionStats;
+  prodStats: RepProductionStats;
+  history: DailyNumberRow[];
   role: "setter" | "closer";
   repName: string;
 }
 
-export function StaffDashboardClient({ metrics, role, repName }: Props) {
+export function StaffDashboardClient({ prodStats, history, role, repName }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("pipeline");
   const [countdown, setCountdown] = useState(Math.round(REFRESH_INTERVAL / 1000));
@@ -427,25 +479,19 @@ export function StaffDashboardClient({ metrics, role, repName }: Props) {
     return () => { clearInterval(refreshId); clearInterval(tickId); };
   }, [router]);
 
-  const isProduction = "callsMade" in metrics && "collections" in metrics;
-
   return (
     <div className="flex h-full w-full"
       style={{ background: "linear-gradient(180deg, #0a1525 0%, #080f1e 100%)" }}>
-
-      {/* Sidebar */}
       <StaffSidebar active={tab} onChange={setTab} repName={repName} role={role} />
-
-      {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "pipeline" && isProduction && (
-          <PipelineTab p={metrics as RepProductionStats} countdown={countdown} />
+        {tab === "pipeline" && (
+          <PipelineTab p={prodStats} countdown={countdown} />
         )}
-        {tab === "pipeline" && !isProduction && (
-          <LegacyView metrics={metrics as SetterStats | CloserStats} role={role} countdown={countdown} />
-        )}
-        {tab === "today" && (
-          <TodayForm onSubmitted={() => { setTab("pipeline"); router.refresh(); }} />
+        {tab === "performance" && (
+          <PerformanceTab
+            history={history}
+            onSubmitted={() => { setTab("pipeline"); router.refresh(); }}
+          />
         )}
       </div>
     </div>
