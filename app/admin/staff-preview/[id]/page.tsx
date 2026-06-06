@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getRepProductionStats, getRepDailyNumbers } from "@/lib/analytics/daily-numbers";
+import { getRepProductionStats, getRepDailyNumbers, getAdminDashboardStats } from "@/lib/analytics/daily-numbers";
 import { StaffDashboardClient } from "@/app/staff/StaffDashboardClient";
 import { ImpersonateButton } from "./ImpersonateButton";
 import { ArrowLeft } from "lucide-react";
@@ -24,9 +24,10 @@ export default async function StaffPreviewPage({ params }: { params: Promise<{ i
 
   if (!member) redirect("/admin/staff");
 
-  const [prodStats, history] = await Promise.all([
+  const [prodStats, history, { repStats }] = await Promise.all([
     getRepProductionStats(member.id, member.name),
     getRepDailyNumbers(member.id),
+    getAdminDashboardStats(),
   ]);
 
   const roleColor = "rgba(74,122,181,0.15)";
@@ -61,6 +62,7 @@ export default async function StaffPreviewPage({ params }: { params: Promise<{ i
       <StaffDashboardClient
         prodStats={prodStats}
         history={history}
+        repStats={repStats}
         role={member.role as "setter" | "closer"}
         repName={member.name}
       />

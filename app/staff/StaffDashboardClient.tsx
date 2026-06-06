@@ -7,7 +7,7 @@ import {
   LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import {
-  BarChart2, ClipboardList,
+  BarChart2, ClipboardList, Trophy,
   DollarSign, Target, TrendingUp, Users,
   Phone, MessageSquare, Calendar, Eye, CheckCircle, Clock, Trash2,
 } from "lucide-react";
@@ -430,13 +430,117 @@ function PerformanceTab({ history, onSubmitted }: { history: DailyNumberRow[]; o
   );
 }
 
+// ── Leaderboard tab ───────────────────────────────────────────────────────────
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+const REP_COLORS = ["#1D9E75", "#D8843A", "#D957A8", "#3B6FB5", "#8A5BC7", "#4a7ab5"];
+
+function LeaderboardTab({ repStats, repName }: { repStats: RepProductionStats[]; repName: string }) {
+  const ranked = [...repStats].sort((a, b) => b.collections - a.collections);
+  const TH = "text-[10px] font-bold uppercase tracking-wider py-2 px-3 text-left";
+  const TD = "py-2.5 px-3 text-sm tabular-nums";
+
+  return (
+    <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: "#dce8f4" }}>Team Leaderboard</h2>
+          <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>Month to date · ranked by cash collected</p>
+        </div>
+        <Trophy className="h-6 w-6" style={{ color: "#fcd34d" }} />
+      </div>
+
+      {ranked.length === 0 ? (
+        <div className="rounded-xl p-8 text-center" style={CARD}>
+          <p className="text-sm" style={{ color: "#4a6a8a" }}>No entries this month yet.</p>
+        </div>
+      ) : (
+        <>
+          {/* Top 3 podium cards */}
+          {ranked.length >= 2 && (
+            <div className="grid grid-cols-3 gap-3">
+              {ranked.slice(0, 3).map((rep, i) => {
+                const isMe = rep.name === repName;
+                return (
+                  <div key={rep.name} className="rounded-xl p-4 text-center"
+                    style={isMe ? GOLD_CARD : CARD}>
+                    <p className="text-2xl mb-1">{MEDALS[i]}</p>
+                    <p className="text-sm font-bold truncate"
+                      style={{ color: isMe ? "#fcd34d" : REP_COLORS[i % REP_COLORS.length] }}>
+                      {rep.name}{isMe ? " (you)" : ""}
+                    </p>
+                    <p className="text-lg font-black tabular-nums mt-1"
+                      style={{ color: isMe ? "#fcd34d" : "#dce8f4" }}>
+                      {fmt$.format(rep.collections)}
+                    </p>
+                    <p className="text-[10px] mt-0.5" style={{ color: "#4a6a8a" }}>
+                      {rep.sales} {rep.sales === 1 ? "deal" : "deals"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Full rankings table */}
+          <div className="rounded-xl overflow-hidden" style={CARD}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(180,210,240,0.08)" }}>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>#</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Rep</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Calls</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Sets</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Shows</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Closed</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Cash</th>
+                    <th className={TH} style={{ color: "#4a6a8a" }}>Close%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranked.map((rep, i) => {
+                    const isMe = rep.name === repName;
+                    const rowStyle: React.CSSProperties = isMe
+                      ? { background: "rgba(252,211,77,0.06)", borderBottom: "1px solid rgba(252,211,77,0.12)" }
+                      : { borderBottom: "1px solid rgba(180,210,240,0.04)" };
+                    return (
+                      <tr key={rep.name} style={rowStyle}>
+                        <td className={TD} style={{ color: "#4a6a8a", fontWeight: 700 }}>
+                          {i < 3 ? MEDALS[i] : i + 1}
+                        </td>
+                        <td className={TD} style={{ color: isMe ? "#fcd34d" : "#dce8f4", fontWeight: isMe ? 700 : 400 }}>
+                          {rep.name}{isMe ? " ★" : ""}
+                        </td>
+                        <td className={TD} style={{ color: "#a8bdd4" }}>{rep.callsMade}</td>
+                        <td className={TD} style={{ color: "#a8bdd4" }}>{rep.set}</td>
+                        <td className={TD} style={{ color: "#a8bdd4" }}>{rep.show}</td>
+                        <td className={TD} style={{ color: rep.sales > 0 ? "#4ade80" : "#a8bdd4" }}>{rep.sales}</td>
+                        <td className={TD} style={{ color: isMe ? "#fcd34d" : rep.collections > 0 ? "#dce8f4" : "#a8bdd4", fontWeight: isMe ? 700 : 400 }}>
+                          {fmt$.format(rep.collections)}
+                        </td>
+                        <td className={TD} style={{ color: "#a8bdd4" }}>{rep.closeRate}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-type Tab = "pipeline" | "performance";
+type Tab = "pipeline" | "performance" | "leaderboard";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "pipeline",    label: "Pipeline",        icon: BarChart2 },
-  { id: "performance", label: "My Performance",  icon: ClipboardList },
+  { id: "pipeline",    label: "Pipeline",       icon: BarChart2 },
+  { id: "performance", label: "My Performance", icon: ClipboardList },
+  { id: "leaderboard", label: "Leaderboard",    icon: Trophy },
 ];
 
 function StaffSidebar({ active, onChange, repName, role }: {
@@ -492,11 +596,12 @@ function StaffSidebar({ active, onChange, repName, role }: {
 interface Props {
   prodStats: RepProductionStats;
   history: DailyNumberRow[];
+  repStats: RepProductionStats[];
   role: "setter" | "closer";
   repName: string;
 }
 
-export function StaffDashboardClient({ prodStats, history, role, repName }: Props) {
+export function StaffDashboardClient({ prodStats, history, repStats, role, repName }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("pipeline");
   const [countdown, setCountdown] = useState(Math.round(REFRESH_INTERVAL / 1000));
@@ -522,6 +627,9 @@ export function StaffDashboardClient({ prodStats, history, role, repName }: Prop
             history={history}
             onSubmitted={() => { setTab("pipeline"); router.refresh(); }}
           />
+        )}
+        {tab === "leaderboard" && (
+          <LeaderboardTab repStats={repStats} repName={repName} />
         )}
       </div>
     </div>
