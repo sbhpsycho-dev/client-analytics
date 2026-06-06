@@ -9,7 +9,7 @@ import {
 import {
   BarChart2, ClipboardList,
   DollarSign, Target, TrendingUp, Users,
-  Phone, MessageSquare, Calendar, Eye, CheckCircle, Clock,
+  Phone, MessageSquare, Calendar, Eye, CheckCircle, Clock, Trash2,
 } from "lucide-react";
 import type { RepProductionStats } from "@/lib/analytics/sheet-metrics";
 import type { DailyNumberRow } from "@/lib/analytics/daily-numbers";
@@ -235,7 +235,9 @@ function EntryForm({ onSubmitted, defaults }: {
 
 // ── History table ─────────────────────────────────────────────────────────────
 
-function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
+function HistoryTable({ rows, onDeleted }: { rows: DailyNumberRow[]; onDeleted: (id: string) => void }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
   const currentMonth = today.slice(0, 7);
   const mtd = rows.filter(r => r.date.startsWith(currentMonth));
@@ -251,6 +253,18 @@ function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
     }),
     { calls_made: 0, sets: 0, shows: 0, sales: 0, collections: 0, commissions: 0 }
   );
+
+  async function handleDelete(id: string) {
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/staff/numbers/${id}`, { method: "DELETE" });
+      if (!res.ok) { toast.error("Failed to delete entry"); return; }
+      onDeleted(id);
+      router.refresh();
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const TH = "text-[10px] font-bold uppercase tracking-wider py-2 px-3 text-left";
   const TD = "py-2 px-3 text-sm tabular-nums";
@@ -269,6 +283,7 @@ function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
               <th className={TH} style={{ color: "#4a6a8a" }}>Cash</th>
               <th className={TH} style={{ color: "#4a6a8a" }}>Comm.</th>
               <th className={TH} style={{ color: "#4a6a8a" }}>Sync</th>
+              <th className={TH} />
             </tr>
           </thead>
           <tbody>
@@ -288,6 +303,16 @@ function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
                     ? <CheckCircle className="h-3.5 w-3.5" style={{ color: "#4ade80" }} />
                     : <Clock       className="h-3.5 w-3.5" style={{ color: "#7a9ab8" }} />}
                 </td>
+                <td className="py-2 px-2">
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    disabled={deleting === r.id}
+                    className="rounded p-1 transition-colors hover:bg-red-500/10 disabled:opacity-40"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" style={{ color: "#f87171" }} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -301,6 +326,7 @@ function HistoryTable({ rows }: { rows: DailyNumberRow[] }) {
                 <td className={TD} style={{ color: "#4ade80", fontWeight: 700 }}>{totals.sales}</td>
                 <td className={TD} style={{ color: "#fcd34d", fontWeight: 700 }}>{fmt$.format(totals.collections)}</td>
                 <td className={TD} style={{ color: "#4a7ab5", fontWeight: 700 }}>{fmt$.format(totals.commissions)}</td>
+                <td className={TD} />
                 <td className={TD} />
               </tr>
             </tfoot>
@@ -375,8 +401,9 @@ function PipelineTab({ p, countdown }: { p: RepProductionStats; countdown: numbe
 // ── My Performance tab ────────────────────────────────────────────────────────
 
 function PerformanceTab({ history, onSubmitted }: { history: DailyNumberRow[]; onSubmitted: () => void }) {
+  const [rows, setRows] = useState<DailyNumberRow[]>(history);
   const today = new Date().toISOString().slice(0, 10);
-  const todayEntry = history.find(r => r.date === today) ?? null;
+  const todayEntry = rows.find(r => r.date === today) ?? null;
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
@@ -394,7 +421,10 @@ function PerformanceTab({ history, onSubmitted }: { history: DailyNumberRow[]; o
 
       <div className="space-y-3">
         <SectionHeader title="Entry History" />
-        <HistoryTable rows={history} />
+        <HistoryTable
+          rows={rows}
+          onDeleted={(id) => setRows(prev => prev.filter(r => r.id !== id))}
+        />
       </div>
     </div>
   );
